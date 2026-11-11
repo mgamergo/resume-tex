@@ -6,11 +6,13 @@ import {
 import { convexOperation } from "../../lib/server/convex-errors";
 test("Convex deadlines start per fetch, include the body, preserve caller aborts and never replay", async () => {
   let calls = 0;
+  let arrived: () => void = () => {};
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
     fetch(request) {
       calls++;
+      arrived();
       if (new URL(request.url).pathname === "/fast")
         return Response.json({ ok: true });
       return new Response(
@@ -27,28 +29,37 @@ test("Convex deadlines start per fetch, include the body, preserve caller aborts
     const base = `http://127.0.0.1:${server.port}`;
     const bounded = createConvexFetch({ deadlineMs: 100 });
     await Bun.sleep(120);
-    expect(await (await bounded(base + "/fast")).json()).toEqual({ ok: true });
+    expect(
+      await (await bounded(base + "/fast", { method: "POST" })).json(),
+    ).toEqual({ ok: true });
     expect(calls).toBe(1);
     await expect(
-      createConvexFetch({ deadlineMs: 50 })(base + "/stall"),
+      createConvexFetch({ deadlineMs: 50 })(base + "/stall", {
+        method: "POST",
+      }),
     ).rejects.toBeInstanceOf(ConvexDeadlineError);
     expect(calls).toBe(2);
     for (const placement of ["init", "request"]) {
       const abort = new AbortController();
+      const arrival = new Promise<void>((resolve) => {
+        arrived = resolve;
+      });
       const request =
         placement === "request"
-          ? new Request(base + "/stall", { signal: abort.signal })
+          ? new Request(base + "/stall", {
+              method: "POST",
+              signal: abort.signal,
+            })
           : base + "/stall";
       const pending = createConvexFetch({ deadlineMs: 200 })(
         request,
-        placement === "init" ? { signal: abort.signal } : undefined,
+        placement === "init"
+          ? { method: "POST", signal: abort.signal }
+          : undefined,
       );
-      const timer = setTimeout(() => abort.abort(), 10);
-      try {
-        await expect(pending).rejects.not.toBeInstanceOf(ConvexDeadlineError);
-      } finally {
-        clearTimeout(timer);
-      }
+      await Promise.race([arrival, pending]);
+      abort.abort();
+      await expect(pending).rejects.toMatchObject({ name: "AbortError" });
     }
     expect(calls).toBe(4);
   } finally {
