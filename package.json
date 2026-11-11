@@ -4,9 +4,9 @@
   "private": true,
   "packageManager": "bun@1.4.4",
   "scripts": {
-    "dev": "bun scripts/prepare-assets.ts && bun --bun next dev --hostname localhost",
+    "dev": "bun scripts/prepare-assets.ts && node node_modules/next/dist/bin/next dev --hostname localhost",
     "build": "bun scripts/prepare-assets.ts && bun --bun next build",
-    "start": "bun --bun next start --hostname localhost",
+    "start": "node node_modules/next/dist/bin/next start --hostname localhost",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",

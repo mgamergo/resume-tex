@@ -1,3 +1,4 @@
+import { createConvexFetch } from "./convex-fetch";
 import { convexOperation } from "./convex-errors";
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
@@ -31,7 +32,9 @@ export interface Store {
 export function getStore(token: string): Store {
   if (!process.env.NEXT_PUBLIC_CONVEX_URL)
     throw new Error("Configure NEXT_PUBLIC_CONVEX_URL through Infisical");
-  const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
+  const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL, {
+    fetch: createConvexFetch(),
+  });
   client.setAuth(token);
   const query = <T>(op: string, args: Record<string, unknown> = {}) =>
     convexOperation("query", () =>

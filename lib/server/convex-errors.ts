@@ -1,3 +1,4 @@
+import { ConvexDeadlineError } from "./convex-fetch";
 import { reportUpstreamError } from "./upstream-diagnostics";
 import { ConvexError } from "convex/values";
 import { z } from "zod";
@@ -33,6 +34,13 @@ export async function convexOperation<T>(
     const mapped = mapConvexError(error);
     if (mapped) throw mapped;
     reportUpstreamError("convex", error, startedAt, { operationKind });
+    if (error instanceof ConvexDeadlineError)
+      throw new DomainError(
+        operationKind === "query"
+          ? "Storage read timed out. Try again shortly."
+          : "The change may have been saved. Download any unsaved source before refreshing to check the latest state.",
+        503,
+      );
     throw error;
   }
 }

@@ -1,6 +1,6 @@
 # Resume TeX
 
-A LaTeX resume workspace with a source editor, compiled PDF, reviewable assistant, version history, and PDF-derived ATS checks. Bun is the supported runtime and package manager.
+A LaTeX resume workspace with a source editor, compiled PDF, reviewable assistant, version history, and PDF-derived ATS checks. Bun manages dependencies and runs builds and tests. Next.js runs on Node.js 22.
 
 ## Setup
 

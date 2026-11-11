@@ -1,3 +1,8 @@
+# 2026-11-11 — Bound real storage transport
+
+- The actual late-response flow that previously hung for 95 seconds passed under Node 22 in 25.5 seconds. Next dev/start now use Node while Bun remains the package manager and build/test runner; the complete candidate gate is pending.
+- Convex fetches have a fresh 20-second deadline through response-body consumption, preserve caller cancellation, and never replay. Read deadlines return 503; write deadlines explicitly report unknown outcome and recommend downloading unsaved source before refreshing. Focused transport and structured-error regressions pass (3 tests); typecheck passes.
+
 # Logbook
 
 ## 2026-11-11 — Isolate test fixture storage
