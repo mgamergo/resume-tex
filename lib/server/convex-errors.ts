@@ -48,7 +48,9 @@ export async function convexOperation<T>(
       const mapped = mapConvexError(error);
       if (mapped) throw mapped;
       const transportFailure =
-        error instanceof ConvexDeadlineError || isKnownTransportFailure(error);
+        !(error instanceof ConvexError) &&
+        (error instanceof ConvexDeadlineError ||
+          isKnownTransportFailure(error));
       const retry =
         operationKind === "query" && transportFailure && attempt === 1;
       reportUpstreamError("convex", error, startedAt, {
