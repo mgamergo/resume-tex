@@ -16,11 +16,14 @@ test("upstream telemetry keeps error messages requests headers and tokens out of
       }),
       { status: 404, errors: [{ code: "session_not_found", message: secret }] },
     );
-    reportUpstreamError("convex", error, Date.now());
+    reportUpstreamError("convex", error, Date.now(), {
+      operationKind: "query",
+    });
     expect(logged).toHaveLength(1);
     expect(JSON.parse(logged[0])).toMatchObject({
       event: "upstream_error",
       service: "convex",
+      operationKind: "query",
       name: "Error",
       status: 404,
       codes: ["session_not_found", "ECONNRESET"],
