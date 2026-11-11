@@ -1,5 +1,9 @@
 # Logbook
 
+## 2026-11-11 — Refresh Sol approval
+
+The second UI/UX Sol round approved clean `f63eabf`: S1 and S2 resolved, Escape handling accepted, no new findings. The reviewer verified all eight correction screenshots against the evidence manifest and read the passing logs; it ran no suites or browsers. Two rounds used gpt-6.1-sol on high reasoning; usage was not returned. The tested behavior remains `cb6860c` with the recorded digest. This final change records approval only. The same box and private port-3000 preview remain in use; external MCP is intentionally unverified.
+
 ## 2026-11-11 — UI corrections verified
 
 Candidate `cb6860c62bd14c7c3515d8558a50ef00121ade58` passed the focused repeated 360px keyboard check and the full gate: formatting, types, lint, build, 50 Bun tests/321 assertions, three Convex tests and 12 real-service Chromium cases. Nine diagnostic reports are empty; two exact in-flight navigation cancellations are saved separately. The evidence manifest covers 52 screenshots and seven videos. Test-owned users/documents and the test server are cleaned. The same box retains the live port-3000 preview. Sol round 2 will check the open findings and changed code; no push occurs during that review.
