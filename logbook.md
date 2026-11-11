@@ -1,5 +1,11 @@
 # Logbook
 
+## 2026-11-11 — Local workstation setup
+
+- Cloned origin/dev and created chore/local-setup. Installed frozen Bun dependencies, TinyTeX, Chromium, and repository-local Node 22.23.4. Ignored .env.local selects local/mock mode and PDF_NODE_BINARY. No system files or connected services changed.
+- Made the TeX setup tolerate missing Dash and replace its read-only compiler runner on repeated setup. PDF_NODE_BINARY overrides the default /usr/bin/node. Raised the PDF worker virtual-address limit to 4 GiB after both system Node 26 and local Node 22 exhausted the 2 GiB limit on this workstation. The 128 MiB heap and CPU/deadline limits remain unchanged.
+- Build, lint, formatting, 34 unit tests with 208 assertions, and three Convex emulator tests pass. All five Chromium workflows pass in 39.5 seconds; inspected artifacts/editor-desktop.png confirms the editor and actual PDF preview render. Run bun run dev and open http://127.0.0.1:3000. For tests, export PDF_NODE_BINARY="$PWD/.tools/node22/node_modules/node-linux-x64/bin/node" before bun run test.
+
 ## 2026-11-11 — V1 reviews approved and handoff
 
 - Functionality sol-loop approved in two rounds; UI/UX sol-loop approved in three at 2c2c395. All F1–F6 and U1–U3 are resolved, with no declined or disputed findings. Reviewer provider/model/effort: codex/gpt-6.1-sol/high; usage was not exposed. docs/sol-reviews.md records findings, outcomes and diff sizes.

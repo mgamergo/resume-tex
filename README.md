@@ -14,6 +14,8 @@ APP_MODE=local AI_PROVIDER=mock bun run dev
 
 Open `http://127.0.0.1:3000`. Local mode is explicit, credential-free, and single-author. SQLite, PDF cache, and history live under `.data`. Bind only to loopback; local mode also rejects non-loopback request hosts. Do not put a reverse proxy or public tunnel in front of local mode.
 
+If system Node is a different version, set `PDF_NODE_BINARY` in `.env.local` to the absolute path of a Node 22 binary. Tests require this variable in the shell environment because Bun does not load `.env.local` in test mode. The TeX setup uses Bash when Dash is unavailable.
+
 ```sh
 APP_MODE=local AI_PROVIDER=mock bun run build
 APP_MODE=local AI_PROVIDER=mock bun run start

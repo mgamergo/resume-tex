@@ -12,13 +12,16 @@ texbin="$PWD/.tools/.TinyTeX/bin/x86_64-linux"
 "$texbin/tlmgr" update --self
 "$texbin/tlmgr" install xetex moderncv fontawesome5 fontawesome6 academicons multirow arydshln microtype fontspec xcolor geometry enumitem titlesec hyperref collection-fontsrecommended lm latexmk etoolbox iftex tools fancyhdr marvosym parskip tikzmark pgf qrcode adjustbox collectbox xpatch unicode-math
 mkdir -p .tools/rootfs/usr/bin .tools/rootfs/etc .tools/rootfs/fonts .tools/rootfs/bin .tools/rootfs/input .tools/rootfs/lib64 .tools/rootfs/work .tools/rootfs/tmp .tools/rootfs/proc .tools/rootfs/dev .tools/rootfs/tex
-cp /usr/bin/dash .tools/rootfs/bin/sh
+runtime_shell=/usr/bin/dash
+if [ ! -x "$runtime_shell" ]; then runtime_shell=/usr/bin/bash; fi
+cp "$runtime_shell" .tools/rootfs/bin/sh
 cp /usr/bin/base64 /usr/bin/head .tools/rootfs/usr/bin/
+if [ -f .tools/rootfs/usr/bin/compiler-runner ]; then chmod u+w .tools/rootfs/usr/bin/compiler-runner; fi
 cp scripts/compiler-runner.sh .tools/rootfs/usr/bin/compiler-runner
 chmod 555 .tools/rootfs/usr/bin/compiler-runner
 touch .tools/rootfs/input/main.tex
 cp /usr/bin/prlimit .tools/rootfs/usr/bin/
-for executable in /usr/bin/dash /usr/bin/base64 /usr/bin/head /usr/bin/prlimit "$texbin/pdftex" "$texbin/xetex" "$texbin/xdvipdfmx"; do
+for executable in "$runtime_shell" /usr/bin/base64 /usr/bin/head /usr/bin/prlimit "$texbin/pdftex" "$texbin/xetex" "$texbin/xdvipdfmx"; do
   while IFS= read -r library; do cp --parents --dereference "$library" .tools/rootfs/; done < <(ldd "$executable" | awk '/=> \// {print $3} /^[[:space:]]*\// {print $1}')
 done
 if [ -d /usr/share/fonts/truetype ]; then cp -a /usr/share/fonts/truetype .tools/rootfs/fonts/; fi

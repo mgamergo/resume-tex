@@ -8,7 +8,7 @@ import { atsSchema } from "../core/schemas";
 import type { PdfText } from "../core/ats";
 export const pdfExtractionPolicy = {
   wallMs: 8_000,
-  memoryBytes: 2_147_483_648,
+  memoryBytes: 4_294_967_296,
   maxInputBytes: 10_485_760,
   maxOutputBytes: 4_000_000,
   maxQueue: 3,
@@ -53,7 +53,7 @@ export async function extractPdf(bytes: Uint8Array): Promise<PdfText> {
           "--nofile=64",
           "--fsize=4194304",
           "--",
-          "/usr/bin/node",
+          process.env.PDF_NODE_BINARY || "/usr/bin/node",
           "--disable-wasm-trap-handler",
           "--max-old-space-size=128",
           "--max-semi-space-size=8",
