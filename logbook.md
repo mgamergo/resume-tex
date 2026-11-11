@@ -1,5 +1,9 @@
 # Logbook
 
+## 2026-11-11 — UI corrections verified
+
+Candidate `cb6860c62bd14c7c3515d8558a50ef00121ade58` passed the focused repeated 360px keyboard check and the full gate: formatting, types, lint, build, 50 Bun tests/321 assertions, three Convex tests and 12 real-service Chromium cases. Nine diagnostic reports are empty; two exact in-flight navigation cancellations are saved separately. The evidence manifest covers 52 screenshots and seven videos. Test-owned users/documents and the test server are cleaned. The same box retains the live port-3000 preview. Sol round 2 will check the open findings and changed code; no push occurs during that review.
+
 ## 2026-11-11 — Dialog key trace
 
 The first Escape fallback was insufficient. A focused browser trace showed Escape reaching the search input, becoming default-prevented and leaving the dialog open. The application dialog now handles Escape explicitly even when the underlying layer marks it prevented. Existing close/focus assertions remain; a focused repeated check must pass before another complete browser run. Temporary diagnostic test code was removed, while its ignored key trace and failed logs remain.

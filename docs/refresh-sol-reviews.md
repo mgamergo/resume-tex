@@ -19,6 +19,12 @@ Initial diff: 55 files, 2,501 insertions and 799 deletions.
 
 The first full recheck passed the new 360px test but failed an existing immediate-Escape/focus-return assertion. A focused real-browser key trace then proved that Escape reached the focused search field and became default-prevented while the dialog remained open. The first content fallback skipped prevented events and did not resolve the failure. The current handler closes this application dialog explicitly on Escape; it retains the existing focus-return path. The 360px test repeats immediate open/Escape/focus-return three times in each theme, and existing tablet/phone assertions remain unchanged. A separate real Convex mutation timed out and correctly was not replayed. Failed and interrupted runs remain archived and are not counted as passes. Temporary diagnostic test code was removed.
 
+## Verification after corrections
+
+Behavior candidate: `cb6860c62bd14c7c3515d8558a50ef00121ade58`; non-document code digest: `e48eb477c80beee1d3c6c4a7eaaf277848e72c7eff9a007e23d1125e4854eb06`. The complete `refresh-review-gate3` gate passed formatting, types, lint, build, 50 Bun tests/321 assertions, three Convex tests and all 12 real-service Chromium cases in 5.0 minutes. A focused 360px run also passed before the complete browser run. The original assertions were preserved.
+
+Nine diagnostic arrays are empty. Two narrowly classified cancellations during explicit navigation are recorded separately. The evidence manifest hashes 52 PNGs and seven videos. Test identities/documents are cleaned, the test server is stopped, and the same box keeps the user-requested preview running. External authenticated MCP remains intentionally unverified.
+
 ## Round 2
 
 Focused recheck pending after verification of the two small fixes. No push occurs during the review loop.
