@@ -222,12 +222,38 @@ test("all templates render and desktop/tablet/mobile controls, dark theme and sc
   page,
 }) => {
   const errors = attachDiagnostics(page);
+  await page.addInitScript(() => {
+    const NativeObserver = window.ResizeObserver;
+    const active = new Set<ResizeObserver>();
+    const publish = () => {
+      document.documentElement.dataset.pdfObservers = String(active.size);
+    };
+    window.ResizeObserver = class extends NativeObserver {
+      override observe(target: Element, options?: ResizeObserverOptions) {
+        super.observe(target, options);
+        if (target.classList.contains("pdf-pages")) {
+          active.add(this);
+          publish();
+        }
+      }
+      override disconnect() {
+        super.disconnect();
+        active.delete(this);
+        publish();
+      }
+      override unobserve(target: Element) {
+        super.unobserve(target);
+        if (target.classList.contains("pdf-pages")) {
+          active.delete(this);
+          publish();
+        }
+      }
+    };
+  });
   await page.goto("/");
   for (const name of ["Deedy", "AltaCV-style", "moderncv", "Jake's Resume"]) {
     await newResume(page, name);
-    expect(await page.locator(".textLayer").innerText()).toContain(
-      "TypeScript",
-    );
+    await expect(page.locator(".textLayer")).toContainText("TypeScript");
     await page.getByLabel("Back to resumes", { exact: true }).click();
   }
   await page
@@ -366,6 +392,8 @@ test("all templates render and desktop/tablet/mobile controls, dark theme and sc
   });
   for (let step = 0; step < 6; step++)
     await page.getByRole("button", { name: "Zoom out", exact: true }).click();
+  await expect(page.locator(".textLayer")).toContainText("Alex");
+  await expect(page.locator("html")).toHaveAttribute("data-pdf-observers", "1");
   await page.getByRole("tab", { name: "LaTeX", exact: true }).click();
   const token = page
     .locator(".cm-content span")
@@ -403,6 +431,7 @@ test("all templates render and desktop/tablet/mobile controls, dark theme and sc
     fullPage: true,
   });
   await page.getByLabel("Back to resumes", { exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-pdf-observers", "0");
   await noOverflow(page);
   await page.screenshot({
     path: "artifacts/dashboard-mobile-dark.png",

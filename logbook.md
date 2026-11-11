@@ -1,5 +1,11 @@
 # Logbook
 
+## 2026-11-11 — Final PDF observer correction
+
+- UI Sol round 2 resolved U1/U2 and requested one remaining U3 guard after the awaited initial draw. Added the disposal check before observer construction so teardown cannot attach a late observer. Browser instrumentation keeps native observer behavior and asserts one PDF observer after repeated zoom, zero after leaving the editor.
+- A transient boxes control disconnect did not stop the original test process; its PID/logs were reconciled without duplicate runs. That run found a pre-existing eager template-text assertion racing a legitimate redraw. Replaced it with a retrying assertion for the same TypeScript text. The failed report remains archived.
+- The next complete scripts/verify-local.sh run passed all format/type/lint/unit/Convex/build/browser checks: 34 Bun tests/208 assertions, three Convex tests and five Chromium cases. All seven diagnostic reports are empty. Current behavior awaits UI Sol round 3; no push during the UI loop.
+
 ## 2026-11-11 — UI review corrections and PDF cancellation
 
 - Accepted U1/U2 from UI Sol round 1: command Find now reveals source and focuses search after dialog closure; dialogs retain and restore their opener while Find gets its destination focus. Keyboard assertions cover PDF/Assistant/ATS origins, search matches, Escape and rename/command focus at 768px and 390px.

@@ -116,6 +116,7 @@ export function PdfPreview({
           }
         };
         await draw();
+        if (disposed) return;
         observer = new ResizeObserver(() => {
           void draw();
         });
