@@ -1,54 +1,15 @@
-# 2026-11-11 — Attribute explicit navigation image cancellation
-
-- The frozen fe4c622 gate passed every core check and 10 of 11 browser cases (4.8 minutes). Its only unexpected diagnostic was an already-inflight Clerk avatar image canceled by explicit reload; all 36 ready-authenticated screenshots and interaction assertions passed. Live known transport recovery was observed for Clerk (317 ms) and a Convex query (941 ms), with original failures and recovery logged.
-- Navigation attribution now additionally requires GET, resource type image, exact HTTPS img.clerk.com/default port and encoded avatar path, an already-recorded pre-navigation request, and exact ERR_ABORTED inside the existing bounded navigation window. Near misses remain rejected; every HTTP error and ordinary action failure remains unexpected. Production source is unchanged.
-
-# 2026-11-11 — Recover bounded reads without replaying writes
-
-- The next live gate passed 10 of 11 browser cases; only initial authenticated list loading hit a real Convex query deadline. All four templates, the apply-lock flow, async races and the 36-frame evidence matrix passed. No Clerk recovery was needed. This remains a failed complete gate.
-- Separate fresh Node processes each completed 20 anonymous real queries with the expected structured authentication denial: standard connections 177–328 ms; Connection:close 202–517 ms. No pooling change was justified.
-- Read and write clients now have immutable separate transport deadlines: reads 8 seconds with at most one retry after 100 ms on an own deadline or confirmed native transport failure; writes 20 seconds and one attempt. Structured/business/HTTP errors and caller aborts never retry. Exhaustion remains visible as 503; writes explicitly preserve unknown outcome. Safe first-failure and recovery/exhaustion events remain logged. Focused regressions and typecheck pass; complete verification is pending.
-
-# 2026-11-11 — Recover token transport once
-
-- Node candidate 31f2e32 passed all core checks and 10 of 11 live browser cases (4.4 minutes), including the prior Convex failure and the complete screenshot matrix. One ordinary workspace read failed before storage at Clerk token acquisition (20 ms, absent HTTP status, SDK unexpected_error, caller not aborted); this is retained as a failed gate.
-- Token acquisition now allows one 100 ms abortable retry on the same authenticated session only when a local classifier confirms exact known transport evidence. HTTP errors, rate limits, auth/configuration errors, unknown failures and caller aborts are never retried. No storage operation or model request is replayed. First failures and recovery/exhaustion are logged without messages or credentials. Focused success/exhaustion/no-retry/cancellation regressions pass; complete verification is pending.
-
-# 2026-11-11 — Bound real storage transport
-
-- The actual late-response flow that previously hung for 95 seconds passed under Node 22 in 25.5 seconds. Next dev/start now use Node while Bun remains the package manager and build/test runner; the complete candidate gate is pending.
-- Convex fetches have a fresh 20-second deadline through response-body consumption, preserve caller cancellation, and never replay. Read deadlines return 503; write deadlines explicitly report unknown outcome and recommend downloading unsaved source before refreshing. Focused transport and structured-error regressions pass (3 tests); typecheck passes.
-
 # Logbook
 
-## 2026-11-11 — Isolate test fixture storage
+## 2026-11-11 — Real-service refresh verified
 
-- One focused tools-only unit run used the moved fixture's inherited .data default and added test document 2e790de2-0fe0-4d1b-a94b-1de48fd98260 under owner provider-race. The fixture now uses in-memory SQLite only, independent of DATA_DIR. Shared tenant/CAS/history tests remain intact.
-- Authorized cleanup checked the exact owner, name, timestamp, digest and full source before deleting that document and its two revisions in one transaction. No proposals existed. All unrelated row hashes match, both older provider-race records remain, and DB/WAL/SHM inodes are unchanged. PERSIST_WAL was verified on a temporary probe before use. Evidence: artifacts/refresh-sqlite-cleanup.json.
-- Real preview on port 3000 is restored through Infisical from stable build 8, with localhost origin and /usr/bin/node PDF worker. Latest targeted native-fetch run passed both previously failing browser cases. Sanitized service telemetry is retained for the final full gate; no historical reset is assigned a cause without a measured failure.
+- Removed runtime local/mock/demo paths and browser draft persistence. Real Clerk/Convex ownership gates the workspace; only a configured compatible model is available. Four blank layouts preserve their engines/macros/fonts, including the sandbox fullpage dependency. Historical local documents and browser keys remain preserved and are not migrated.
+- Refreshed neutral light/near-black UI with blue accents and concise copy. A prepaint system/light/dark preference follows live OS changes and works without storage. Source/PDF focus, dialogs, async apply locks, editor isolation and PDF disposal are retained.
+- Real verification exposed strict-save field leakage and unreliable model offsets. Route projection and unique immutable exact-text selectors fix them while preserving public ranges, digest/CAS, tenant ownership and explicit review. Read transport has bounded safe recovery; writes never replay and report unknown outcome. No pooling changes were justified by real bounded comparisons.
+- Complete candidate 47a96ec passed format/types/lint/build, 50 Bun tests/321 assertions, three Convex tests and all 11 real-service Chromium cases (4.8 minutes). One external authenticated MCP case is intentionally skipped because credentials are absent. All eight saved diagnostic reports are empty; narrow explicit-navigation cancellations are recorded separately. The final marker/digest, 44 before/after frames and six videos are indexed in artifacts/refresh-final-evidence.json and docs/refresh-verification.md. Earlier failed/interrupted runs remain retained.
+- A moved test fixture initially added one test-owned SQLite row (2e790de2-0fe0-4d1b-a94b-1de48fd98260). Authorized exact-match cleanup removed only that row and its two revisions; unrelated row hashes and DB/WAL/SHM inodes are unchanged. The fixture now uses memory only. Evidence: artifacts/refresh-sqlite-cleanup.json. Real test users/documents were cleaned; test3100 is stopped. The authorized private real-service preview remains on3000.
+- Next: parent independent Sol review. No app publishing, main merge, Dokploy change or public port was performed. See docs/refresh-verification.md for commands, screenshots and Chromium/MCP limits.
 
-## 2026-11-11 — Upstream diagnostic checkpoint
-
-- The frozen 9928aec driver passed format/types/lint/build, 39 Bun tests / 228 assertions, three Convex tests and nine of eleven real browser cases. Two remaining cases encountered actual upstream connection resets, so that driver is recorded as failed. No assertions or errors were suppressed to claim completion.
-- Added sanitized service/name/cause-code/duration telemetry around Clerk token issuance, Convex operations and model fetch. Native fetch remains unchanged; credentials, requests, headers and error messages are excluded. Sanitization regression and typecheck pass. The fresh-checkout browser setup now creates its ignored .data journal directory without deleting data.
-- A targeted ordinary-launch rerun passed the actual readonly/proposal workflow in 37.9 seconds; complete evidence recapture and the final coherent gate follow. Historical reset attribution remains open until a measured failure or a clean final run.
-
-## 2026-11-11 — Real editing and proposal review corrections
-
-- Real service tests reproduced a connected save failure: transport op leaked into strict Convex save input. Projected domain fields at the route boundary. Clerk sessions, tenant isolation, CAS409, source/PDF ownership and signout state clearing now pass against the actual services.
-- The real model sometimes miscounted offsets. Its private wire format now selects unique exact source text in the immutable pre-request snapshot; JavaScript derives UTF-16 ranges. Empty, missing, duplicate and overlapping selections fail. Public tool/MCP ranges, digest/CAS checks and explicit review remain unchanged. Unicode and conflict regressions pass.
-- Held actual accept/restore/reject responses exposed enabled assistant/ATS actions whose apply guard silently ignored clicks. Their disabled states now match the guard, with deterministic browser regression coverage. Mobile header control bounds and document-name ellipsis fix an observed clipped PDF action. Cut repeated dashboard, assistant, ATS and sign-in copy.
-- Real browser tests create marked disposable Clerk users with short-lived sign-in tickets. Cleanup uses their verified Clerk session JWT and Convex identity, records IDs/runIds in an ignored journal, and never persists tokens. Two identities stranded by early failed cleanup were recovered by their exact test markers and removed with their own documents.
-- Targeted theme checks passed; the latest three-case run passed template/responsive49.9s, compile/ATS/evidence31.7s and all36light/dark desktop/tablet/mobile captures. A temporary real-fetch observer saw no failures in that run. Earlier upstream resets and controller disconnects remain archived; neither Node nor Bun alone explains them. Ordinary Bun launch is restored for the final coherent verification. External authenticated MCP e2e remains intentionally skipped.
-
-## 2026-11-11 — Real-service workspace and blank starters
-
-- Removed production local/mock modes, SQLite implementation and browser draft persistence/recovery; fixtures now live only under tests. All requests require Clerk; Convex derives ownership from the JWT. Auth gate waits for loaded sign-in and keys editor state by user ID. Existing disk databases/browser keys are untouched and not migrated.
-- One real assistant provider remains. Authenticated MCP keeps token verification and access checks; external MCP e2e is explicitly skipped because its credentials are absent.
-- Theme defaults to live OS preference, uses one html preference attribute/CSS-resolved marker and a prepaint initializer, persists explicit System/Light/Dark, and tolerates denied storage. Neutral near-black surfaces, concise copy, blank four-engine-layout starters and schematic thumbnails replace fictional content. Added preprint setup dependency and real sandbox fullpage regression.
-- Core verification: typecheck/lint/build passed; 38 Bun tests/222 assertions plus three Convex tests passed; one external MCP case skipped. Official real Clerk ticket browser smoke reached the deployed private Convex workspace with empty diagnostics and deleted its test-owned user. Three browser cases now pass for real auth and first-paint/live-OS/persistence/cross-tab/denied-storage themes.
-- Fixed observed Clerk self-proxy recursion: Next start/dev must bind localhost to match Clerk middleware rewrite origin. Both Node and Bun with that host passed real auth. Earlier readiness failures are retained in ignored artifacts.
-- Independent parent comment audit found seven redundant starter guidance lines; removed them, retaining legal attribution and existing bundler directives. Full document/LLM/responsive browser verification and independent Sol review remain in progress.
+Earlier entries describe historical versions; their local-mode commands no longer apply.
 
 ## 2026-11-11 — Babel English for imported resumes
 
