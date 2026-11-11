@@ -1,3 +1,4 @@
+import { reportUpstreamError } from "./upstream-diagnostics";
 import { z } from "zod";
 import { applyEdits, DomainError, type Resume } from "../core/model";
 import { documentActionSchema, type ToolCall } from "./tools";
@@ -97,6 +98,7 @@ export class CompatibleProvider implements AssistantProvider {
       )
     )
       throw new DomainError("AI endpoint must use HTTPS or loopback HTTP", 503);
+    const startedAt = Date.now();
     const response = await fetch(
       endpoint.replace(/\/$/, "") + "/chat/completions",
       {
@@ -143,7 +145,10 @@ export class CompatibleProvider implements AssistantProvider {
           max_tokens: 5000,
         }),
       },
-    );
+    ).catch((error: unknown) => {
+      reportUpstreamError("model", error, startedAt);
+      throw error;
+    });
     if (!response.ok)
       throw new DomainError(
         `AI provider returned HTTP ${response.status}. Check provider settings.`,
