@@ -4,7 +4,7 @@ LaTeX source is the authoritative document. A saved revision is immutable. A suc
 
 The editor saves with an expected revision. A conflicting save is reported instead of overwriting another session. Restoring history creates a new revision. AI proposals carry their base digest and exact expected text. Only a user acceptance writes a proposal, and a changed base rejects it.
 
-Server routes own authentication and transport validation. A persistence adapter owns durable transitions, with a local SQLite implementation and a Convex implementation. Convex also checks Clerk identity and ownership itself. Structured edit tools are shared by the assistant and MCP transport. Providers produce proposals rather than writes.
+Server routes own authentication and transport validation. A persistence adapter owns durable transitions, using authenticated Convex storage. Convex also checks Clerk identity and ownership itself. Structured edit tools are shared by the assistant and MCP transport. Providers produce proposals rather than writes.
 
 Compilation takes fixed source and a selected engine profile. The supervisor owns sandbox creation, timeouts, resource limits, cache identity and artifact collection. Compiler children receive no application environment or credentials. The browser displays real output through PDF.js and derives ATS input from those PDF bytes.
 

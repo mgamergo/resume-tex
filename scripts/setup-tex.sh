@@ -10,7 +10,7 @@ if [ ! -x .tools/.TinyTeX/bin/x86_64-linux/pdflatex ]; then
 fi
 texbin="$PWD/.tools/.TinyTeX/bin/x86_64-linux"
 "$texbin/tlmgr" update --self
-"$texbin/tlmgr" install xetex moderncv fontawesome5 fontawesome6 academicons multirow arydshln microtype fontspec xcolor geometry enumitem titlesec hyperref collection-fontsrecommended lm latexmk etoolbox iftex tools fancyhdr marvosym parskip tikzmark pgf qrcode adjustbox collectbox xpatch unicode-math
+"$texbin/tlmgr" install preprint xetex moderncv fontawesome5 fontawesome6 academicons multirow arydshln microtype fontspec xcolor geometry enumitem titlesec hyperref collection-fontsrecommended lm latexmk etoolbox iftex tools fancyhdr marvosym parskip tikzmark pgf qrcode adjustbox collectbox xpatch unicode-math
 mkdir -p .tools/rootfs/usr/bin .tools/rootfs/etc .tools/rootfs/fonts .tools/rootfs/bin .tools/rootfs/input .tools/rootfs/lib64 .tools/rootfs/work .tools/rootfs/tmp .tools/rootfs/proc .tools/rootfs/dev .tools/rootfs/tex
 cp /usr/bin/dash .tools/rootfs/bin/sh
 cp /usr/bin/base64 /usr/bin/head .tools/rootfs/usr/bin/

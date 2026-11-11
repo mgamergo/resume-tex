@@ -1,38 +1,36 @@
 import { convexOperation } from "./convex-errors";
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
-import { LocalStore } from "./local-store";
+
 import type {
   Engine,
   Proposal,
+  ProposalInput,
   Resume,
   ResumeSummary,
   Revision,
   RevisionSummary,
 } from "../core/model";
-export type Store = Pick<
-  LocalStore,
-  | "list"
-  | "get"
-  | "create"
-  | "save"
-  | "remove"
-  | "history"
-  | "revision"
-  | "propose"
-  | "proposals"
-  | "decide"
->;
-export function getStore(owner: string, token?: string): Store {
-  if (process.env.APP_MODE === "local") return new LocalStore(owner);
-  if (
-    process.env.APP_MODE !== "connected" ||
-    !process.env.NEXT_PUBLIC_CONVEX_URL ||
-    !token
-  )
-    throw new Error(
-      "Set APP_MODE=local explicitly, or configure Clerk and Convex for APP_MODE=connected.",
-    );
+export interface Store {
+  list(): Promise<ResumeSummary[]>;
+  get(id: string): Promise<Resume>;
+  create(input: {
+    name: string;
+    source: string;
+    engine: Engine;
+    template: string;
+  }): Promise<Resume>;
+  save(input: SaveInput): Promise<Resume>;
+  remove(id: string): Promise<void>;
+  history(id: string): Promise<RevisionSummary[]>;
+  revision(id: string, revision: number): Promise<Revision>;
+  propose(id: string, input: ProposalInput): Promise<Proposal>;
+  proposals(id: string): Promise<Proposal[]>;
+  decide(id: string, proposalId: string, accept: boolean): Promise<Resume>;
+}
+export function getStore(token: string): Store {
+  if (!process.env.NEXT_PUBLIC_CONVEX_URL)
+    throw new Error("Configure NEXT_PUBLIC_CONVEX_URL through Infisical");
   const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
   client.setAuth(token);
   const query = <T>(op: string, args: Record<string, unknown> = {}) =>

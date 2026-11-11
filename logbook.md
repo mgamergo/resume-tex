@@ -1,5 +1,14 @@
 # Logbook
 
+## 2026-11-11 — Real-service workspace and blank starters
+
+- Removed production local/mock modes, SQLite implementation and browser draft persistence/recovery; fixtures now live only under tests. All requests require Clerk; Convex derives ownership from the JWT. Auth gate waits for loaded sign-in and keys editor state by user ID. Existing disk databases/browser keys are untouched and not migrated.
+- One real assistant provider remains. Authenticated MCP keeps token verification and access checks; external MCP e2e is explicitly skipped because its credentials are absent.
+- Theme defaults to live OS preference, uses one html preference attribute/CSS-resolved marker and a prepaint initializer, persists explicit System/Light/Dark, and tolerates denied storage. Neutral near-black surfaces, concise copy, blank four-engine-layout starters and schematic thumbnails replace fictional content. Added preprint setup dependency and real sandbox fullpage regression.
+- Core verification: typecheck/lint/build passed; 38 Bun tests/222 assertions plus three Convex tests passed; one external MCP case skipped. Official real Clerk ticket browser smoke reached the deployed private Convex workspace with empty diagnostics and deleted its test-owned user. Three browser cases now pass for real auth and first-paint/live-OS/persistence/cross-tab/denied-storage themes.
+- Fixed observed Clerk self-proxy recursion: Next start/dev must bind localhost to match Clerk middleware rewrite origin. Both Node and Bun with that host passed real auth. Earlier readiness failures are retained in ignored artifacts.
+- Independent parent comment audit found seven redundant starter guidance lines; removed them, retaining legal attribution and existing bundler directives. Full document/LLM/responsive browser verification and independent Sol review remain in progress.
+
 ## 2026-11-11 — V1 reviews approved and handoff
 
 - Functionality sol-loop approved in two rounds; UI/UX sol-loop approved in three at 2c2c395. All F1–F6 and U1–U3 are resolved, with no declined or disputed findings. Reviewer provider/model/effort: codex/gpt-6.1-sol/high; usage was not exposed. docs/sol-reviews.md records findings, outcomes and diff sizes.

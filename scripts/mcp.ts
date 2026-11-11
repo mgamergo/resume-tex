@@ -9,22 +9,16 @@ import {
   toolDescriptions,
 } from "../lib/server/tools";
 const resumeId = z.string().min(1).parse(process.env.MCP_RESUME_ID);
-let owner: string;
-let token: string | undefined;
-if (process.env.APP_MODE === "local") owner = "local-workspace";
-else {
-  token = process.env.MCP_CLERK_TOKEN;
-  if (!token || !process.env.CLERK_SECRET_KEY)
-    throw new Error(
-      "Connected MCP requires a Clerk-issued Convex JWT and CLERK_SECRET_KEY from Infisical",
-    );
-  const identity = await verifyToken(token, {
-    secretKey: process.env.CLERK_SECRET_KEY,
-    audience: "convex",
-  });
-  owner = identity.sub;
-}
-const store = getStore(owner, token);
+const token = process.env.MCP_CLERK_TOKEN;
+if (!token || !process.env.CLERK_SECRET_KEY)
+  throw new Error(
+    "MCP requires a Clerk-issued Convex JWT and CLERK_SECRET_KEY from Infisical",
+  );
+await verifyToken(token, {
+  secretKey: process.env.CLERK_SECRET_KEY,
+  audience: "convex",
+});
+const store = getStore(token);
 await store.get(resumeId);
 const server = new McpServer({ name: "resume-tex", version: "1.0.0" });
 server.registerTool(
