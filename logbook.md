@@ -1,5 +1,11 @@
 # Logbook
 
+## 2026-11-11 — Upstream diagnostic checkpoint
+
+- The frozen9928aec driver passed format/types/lint/build,39Bun tests/228assertions, three Convex tests and nine of eleven real browser cases. Two remaining cases encountered actual upstream connection resets, so that driver is recorded as failed. No assertions or errors were suppressed to claim completion.
+- Added sanitized service/name/cause-code/duration telemetry around Clerk token issuance, Convex operations and model fetch. Native fetch remains unchanged; credentials, requests, headers and error messages are excluded. Sanitization regression and typecheck pass. The fresh-checkout browser setup now creates its ignored.data journal directory without deleting data.
+- A targeted ordinary-launch rerun passed the actual readonly/proposal workflow37.9s; complete evidence recapture and the final coherent gate follow. Historical reset attribution remains open until a measured failure or a clean final run.
+
 ## 2026-11-11 — Real editing and proposal review corrections
 
 - Real service tests reproduced a connected save failure: transport op leaked into strict Convex save input. Projected domain fields at the route boundary. Clerk sessions, tenant isolation, CAS409, source/PDF ownership and signout state clearing now pass against the actual services.

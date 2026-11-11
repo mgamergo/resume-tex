@@ -1,3 +1,4 @@
+import { reportUpstreamError } from "./upstream-diagnostics";
 import { auth } from "@clerk/nextjs/server";
 import { DomainError } from "../core/model";
 import { getStore } from "./store";
@@ -17,7 +18,13 @@ export async function scope(request: Request) {
   if (!session.userId)
     throw new DomainError("Sign in to access your resumes", 401);
   const owner = session.userId;
-  const token = await session.getToken({ template: "convex" });
+  const startedAt = Date.now();
+  const token = await session
+    .getToken({ template: "convex" })
+    .catch((error: unknown) => {
+      reportUpstreamError("clerk", error, startedAt);
+      throw error;
+    });
   if (!token)
     throw new DomainError("Clerk Convex JWT template is missing", 503);
   const now = Date.now();

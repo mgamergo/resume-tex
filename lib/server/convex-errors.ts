@@ -1,3 +1,4 @@
+import { reportUpstreamError } from "./upstream-diagnostics";
 import { ConvexError } from "convex/values";
 import { z } from "zod";
 import { DomainError } from "../core/model";
@@ -24,9 +25,13 @@ export function mapConvexError(error: unknown): DomainError | undefined {
 export async function convexOperation<T>(
   operation: () => Promise<T>,
 ): Promise<T> {
+  const startedAt = Date.now();
   try {
     return await operation();
   } catch (error) {
-    throw mapConvexError(error) ?? error;
+    const mapped = mapConvexError(error);
+    if (mapped) throw mapped;
+    reportUpstreamError("convex", error, startedAt);
+    throw error;
   }
 }
