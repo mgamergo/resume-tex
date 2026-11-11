@@ -57,3 +57,24 @@ test("diagnostics redact query strings opaque Clerk identifiers and credentials"
   expect(result).not.toContain("sk_test_private");
   expect(result).not.toContain("eyJprivate");
 });
+
+test("only old Clerk avatar image cancellation during explicit navigation is attributable", () => {
+  const image = {
+    ...workspace,
+    resourceType: "image",
+    url: "https://img.clerk.com/eyJfixture",
+  };
+  expect(isNavigationCancellation(image)).toBe(true);
+  for (const input of [
+    { ...image, recordedBeforeNavigation: false },
+    { ...image, resourceType: "fetch" },
+    { ...image, method: "POST" },
+    { ...image, url: "http://img.clerk.com/eyJfixture" },
+    { ...image, url: "https://img.clerk.com:444/eyJfixture" },
+    { ...image, url: "https://img.clerk.com.example/eyJfixture" },
+    { ...image, url: "https://img.clerk.com/other" },
+    { ...image, failure: "net::ERR_CONNECTION_RESET" },
+    { ...image, failure: "HTTP 500" },
+  ])
+    expect(isNavigationCancellation(input)).toBe(false);
+});

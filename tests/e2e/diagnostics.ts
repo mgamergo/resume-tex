@@ -15,6 +15,7 @@ export function sanitize(value: string) {
 export function isNavigationCancellation(input: {
   recordedBeforeNavigation: boolean;
   method: string;
+  resourceType?: string;
   url: string;
   failure: string | undefined;
   appOrigin: string;
@@ -38,5 +39,12 @@ export function isNavigationCancellation(input: {
     url.hostname === input.clerkHost &&
     url.port === "" &&
     /^\/v1\/client\/sessions\/[^/]+\/tokens$/.test(url.pathname);
-  return workspaceRead || clerkToken;
+  const clerkAvatar =
+    input.method === "GET" &&
+    input.resourceType === "image" &&
+    url.protocol === "https:" &&
+    url.hostname === "img.clerk.com" &&
+    url.port === "" &&
+    /^\/eyJ[A-Za-z0-9_-]+$/.test(url.pathname);
+  return workspaceRead || clerkToken || clerkAvatar;
 }

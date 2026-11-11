@@ -46,11 +46,14 @@ test.beforeEach(async ({ page }, testInfo) => {
   page.on("requestfinished", (request) => navigation.inflight.delete(request));
   page.on("requestfailed", (request) => {
     const failure = request.failure()?.errorText;
-    const message = sanitize(`requestfailed: ${request.url()} ${failure}`);
+    const message = sanitize(
+      `requestfailed: ${request.method()} ${request.resourceType()} ${request.url()} ${failure}`,
+    );
     if (
       isNavigationCancellation({
         recordedBeforeNavigation: navigation.leaving?.has(request) ?? false,
         method: request.method(),
+        resourceType: request.resourceType(),
         url: request.url(),
         failure,
         appOrigin,
