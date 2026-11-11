@@ -1,5 +1,13 @@
 # Logbook
 
+## 2026-11-11 — Verified core checkpoint
+
+- Added immutable SQLite revisions, digest+revision CAS, owner-scoped Convex functions and exact proposal review. Source remains authoritative.
+- Actual Bubblewrap compiler has curated copied ELF libraries, readonly TinyTeX, 32 MiB work and 16 MiB temp tmpfs, network/PID/user isolation, clean environment, fixed no-shell-escape argv, CPU/AS/process/file/wall bounds and bounded pipes/cache/queue. No host fallback.
+- TinyTeX v2026.11 archive SHA verified. Fixed observed .TinyTeX directory, lm package name and moderncv fontawesome6 dependency. Package/runtime manifest participates in cache identity.
+- `bun run typecheck` passes. `bun test tests/unit/core.test.ts` passes 8 tests / 64 assertions, including actual compilation and PDF extraction of all four templates, owner isolation, CAS/restore, proposals and real sandbox probe. Initial logging-only smoke did not establish success; moderncv failed and was fixed before the asserted run.
+- Next: UI, richer ATS/parser fixtures, connected identity tests, production build and browser flows. Cloud service keys remain human setup.
+
 ## 2026-11-11 — Architecture and environment
 
 - Private repository: `mgamergo/resume-tex`; branch `dev`. No merges or publishing authorized.
