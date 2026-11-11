@@ -1,5 +1,9 @@
 # Logbook
 
+## 2026-11-11 — Immediate dialog Escape
+
+The full review recheck exposed a real early-Escape race after command input autofocus, plus a separate upstream Convex write deadline. Added a narrow dialog-content keyboard fallback that respects already-handled events and retains the existing focus-return path. Repeated keyboard open/Escape/focus assertions now cover 360px in both themes. No writes are replayed after transport failure. The failed gate remains archived; a fresh complete gate follows.
+
 ## 2026-11-11 — UI review corrections
 
 Sol round 1 found an unnamed Compile action at widths up to 360px and an ordering claim in the library heading. The compact action now has an explicit state-aware accessible name, and the heading reads “Resumes.” A real-service 360px regression checks both themes, header bounds, keyboard-triggered compilation and actual PDF rendering. Verification and the focused Sol recheck are recorded in `docs/refresh-sol-reviews.md`.

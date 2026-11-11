@@ -1747,6 +1747,12 @@ export function Workspace() {
           }}
         >
           <DialogContent
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && !event.defaultPrevented) {
+                event.preventDefault();
+                setModal(null);
+              }
+            }}
             onCloseAutoFocus={(event) => {
               event.preventDefault();
               const opener = dialogOpener.current;
