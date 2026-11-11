@@ -1,5 +1,8 @@
 import { test, expect } from "bun:test";
-import { CompatibleProvider } from "../../lib/server/provider";
+import {
+  CompatibleProvider,
+  parseProviderCall,
+} from "../../lib/server/provider";
 import { templates } from "../../lib/core/templates";
 import { digest } from "../../lib/core/digest";
 test("compatible provider sends a real function-call HTTP request and validates returned structured arguments", async () => {
@@ -66,4 +69,44 @@ test("compatible provider sends a real function-call HTTP request and validates 
       else process.env[key] = value;
     }
   }
+});
+
+test("provider exact selectors resolve Unicode in the immutable snapshot and reject empty missing ambiguous or overlapping edits", () => {
+  const source = "😀 header\nA unique bullet.\nRepeated. Repeated.";
+  const call = parseProviderCall(source, {
+    tool: "rewrite_bullet",
+    expected: "A unique bullet.",
+    replacement: "A clearer bullet.",
+  });
+  expect(call).toEqual({
+    tool: "rewrite_bullet",
+    start: 10,
+    end: 26,
+    replacement: "A clearer bullet.",
+  });
+  for (const expected of ["", "missing", "Repeated."])
+    expect(() =>
+      parseProviderCall(source, {
+        tool: "rewrite_bullet",
+        expected,
+        replacement: "changed",
+      }),
+    ).toThrow();
+  expect(() =>
+    parseProviderCall("prefix " + source, {
+      tool: "rewrite_bullet",
+      expected: "missing",
+      replacement: "changed",
+    }),
+  ).toThrow();
+  expect(() =>
+    parseProviderCall(source, {
+      tool: "range_patch",
+      title: "Overlap",
+      edits: [
+        { expected: "A unique bullet.", replacement: "a" },
+        { expected: "unique bullet", replacement: "b" },
+      ],
+    }),
+  ).toThrow();
 });

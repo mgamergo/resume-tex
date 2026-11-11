@@ -65,7 +65,16 @@ export async function POST(request: Request) {
         });
       }
       case "save":
-        return Response.json({ resume: await store.save(input) });
+        return Response.json({
+          resume: await store.save({
+            id: input.id,
+            baseDigest: input.baseDigest,
+            expectedRevision: input.expectedRevision,
+            source: input.source,
+            engine: input.engine,
+            name: input.name,
+          }),
+        });
       case "delete":
         await store.remove(input.id);
         return Response.json({ ok: true });

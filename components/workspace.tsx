@@ -495,6 +495,7 @@ export function Workspace() {
     prompt?: string,
     verifiedEvidence?: string,
   ) => {
+    if (applyingRef.current) return;
     const session = documentSession.current;
     const doc = await save(false);
     if (!doc || !isCurrent(doc.id, session)) return;
@@ -517,9 +518,6 @@ export function Workspace() {
       if (result.kind === "proposal") {
         setProposals((current) =>
           reconcileProposals(current, [result.proposal]),
-        );
-        setAgentMessage(
-          `${result.provider} prepared a proposal. Review the exact changes below.`,
         );
       } else
         setAgentMessage(
@@ -573,6 +571,7 @@ export function Workspace() {
     }
   };
   const runAts = async () => {
+    if (applyingRef.current) return;
     const session = documentSession.current;
     const doc = await save(false);
     if (!doc || !isCurrent(doc.id, session)) return;
@@ -598,6 +597,7 @@ export function Workspace() {
     }
   };
   const fixFinding = (fix: string) => {
+    if (applyingRef.current) return;
     if (fix === "columns") {
       void askAgent({ tool: "flatten_columns" });
       return;
@@ -781,7 +781,6 @@ export function Workspace() {
               </span>
               <strong>Resume TeX</strong>
             </Link>
-            <div className="workspace-label">Your workspace</div>
             <nav>
               <button
                 className={dashboardTab === "resumes" ? "selected" : ""}
@@ -799,14 +798,7 @@ export function Workspace() {
               </button>
             </nav>
             <div className="sidebar-bottom">
-              <div className="workspace-note">
-                <span className="status-dot" />
-                Private workspace
-                <small>Your resumes</small>
-              </div>
               <div className="account-row">
-                <div className="avatar">R</div>
-                <span>Your account</span>
                 {themeButton}
                 <UserButton />
               </div>
@@ -1074,6 +1066,7 @@ export function Workspace() {
                           <Button
                             variant="outline"
                             size="sm"
+                            disabled={applying || agentBusy}
                             onClick={() =>
                               void askAgent({
                                 tool: "fix_compile_error",
@@ -1222,11 +1215,10 @@ export function Workspace() {
                         </span>
                         <h2>Assistant</h2>
                         <p>Ask for a change, then review the diff.</p>
-                        <Badge variant="outline">Review before applying</Badge>
                       </div>
                       <div className="suggestion-grid">
                         <button
-                          disabled={agentBusy}
+                          disabled={applying || agentBusy}
                           onClick={() => {
                             setInstruction(
                               "Tighten one bullet while preserving facts",
@@ -1241,7 +1233,7 @@ export function Workspace() {
                           <ChevronRight size={13} />
                         </button>
                         <button
-                          disabled={agentBusy}
+                          disabled={applying || agentBusy}
                           onClick={() => {
                             const sections = [
                               ...source.matchAll(/\\section\*?\{([^}]+)\}/g),
@@ -1265,7 +1257,7 @@ export function Workspace() {
                           <ChevronRight size={13} />
                         </button>
                         <button
-                          disabled={agentBusy || !job.trim()}
+                          disabled={applying || agentBusy || !job.trim()}
                           onClick={() =>
                             void askAgent({
                               tool: "tailor_to_job",
@@ -1285,12 +1277,7 @@ export function Workspace() {
                       {pending.length === 0 ? (
                         <div className="no-proposals">
                           <Check size={17} />
-                          <p>
-                            No pending changes.
-                            <small>
-                              Your source stays untouched until you approve.
-                            </small>
-                          </p>
+                          <p>No pending changes.</p>
                         </div>
                       ) : (
                         pending.map((proposal) => (
@@ -1354,6 +1341,7 @@ export function Workspace() {
                               <Button
                                 variant="outline"
                                 size="sm"
+                                disabled={applying}
                                 onClick={() => void decide(proposal, false)}
                               >
                                 Reject
@@ -1367,6 +1355,7 @@ export function Workspace() {
                           variant="ghost"
                           size="sm"
                           className="undo-proposal"
+                          disabled={applying}
                           onClick={() => {
                             const index = history.findIndex((item) =>
                               item.note.startsWith("Accepted:"),
@@ -1385,6 +1374,7 @@ export function Workspace() {
                         </label>
                         <Textarea
                           id="agent-instruction"
+                          disabled={applying}
                           placeholder="Tighten this bullet, preserve my facts…"
                           value={instruction}
                           onChange={(event) =>
@@ -1393,12 +1383,11 @@ export function Workspace() {
                           maxLength={4000}
                         />
                         <div>
-                          <span>
-                            Changes are proposed, never applied silently.
-                          </span>
                           <Button
                             size="sm"
-                            disabled={agentBusy || !instruction.trim()}
+                            disabled={
+                              applying || agentBusy || !instruction.trim()
+                            }
                             onClick={() => void askAgent()}
                           >
                             {agentBusy ? (
@@ -1417,12 +1406,7 @@ export function Workspace() {
                       className={`insight-content ats-content ${mobileView === "agent" ? "mobile-hide" : ""}`}
                     >
                       <div className="ats-intro">
-                        <h2>See what gets through.</h2>
-                        <p>
-                          Checks use text and geometry from your compiled PDF.
-                          Match a job description to find gaps in the language
-                          you use.
-                        </p>
+                        <h2>ATS check</h2>
                       </div>
                       <label htmlFor="job-description">
                         Job description <span>Optional</span>
@@ -1437,7 +1421,7 @@ export function Workspace() {
                       />
                       <Button
                         onClick={() => void runAts()}
-                        disabled={atsBusy}
+                        disabled={applying || atsBusy}
                         className="run-ats"
                       >
                         {atsBusy ? (
@@ -1541,6 +1525,7 @@ export function Workspace() {
                                 <p>{finding.detail}</p>
                                 {finding.level === "warning" && finding.fix && (
                                   <button
+                                    disabled={applying || agentBusy}
                                     onClick={() =>
                                       fixFinding(finding.fix ?? "")
                                     }
@@ -1587,9 +1572,6 @@ export function Workspace() {
               </div>
               <footer className="workspace-footer">
                 <span>
-                  <span className="status-dot" /> Private workspace
-                </span>
-                <span>
                   Revision {active.revision}
                   <span className="footer-shortcut">⌘ / Ctrl S to compile</span>
                 </span>
@@ -1626,11 +1608,6 @@ export function Workspace() {
                         ? "Templates"
                         : "My resumes"}
                     </h1>
-                    <p>
-                      {dashboardTab === "templates"
-                        ? "Choose a blank layout."
-                        : "Write and manage your resumes."}
-                    </p>
                   </div>
                   <Button onClick={() => setModal("gallery")}>
                     <Plus size={16} />
@@ -1652,12 +1629,14 @@ export function Workspace() {
                 )}
                 {dashboardTab === "resumes" && (
                   <>
-                    <div className="library-heading">
-                      <h2>
-                        My resumes <span>{resumes.length}</span>
-                      </h2>
-                      <span>Last edited</span>
-                    </div>
+                    {resumes.length > 0 && (
+                      <div className="library-heading">
+                        <h2>
+                          Recent <span>{resumes.length}</span>
+                        </h2>
+                        <span>Last edited</span>
+                      </div>
+                    )}
                     {loading ? (
                       <div className="loading-state">
                         <LoaderCircle className="spin" />
@@ -1721,11 +1700,6 @@ export function Workspace() {
                           ? "Choose your layout"
                           : "Templates"}
                       </h2>
-                      <p>
-                        {dashboardTab === "templates"
-                          ? "Blank LaTeX layouts, ready to edit."
-                          : "Start with a blank layout."}
-                      </p>
                     </div>
                     {dashboardTab !== "templates" && (
                       <button onClick={() => setDashboardTab("templates")}>
@@ -1760,14 +1734,6 @@ export function Workspace() {
                       </button>
                     ))}
                   </div>
-                </div>
-                <div className="dashboard-note">
-                  <Braces size={18} />
-                  <p>
-                    <strong>A document you own.</strong> Edit the LaTeX, review
-                    every assistant change, and download your source and PDF at
-                    any time.
-                  </p>
                 </div>
               </div>
             </>
@@ -1879,7 +1845,10 @@ export function Workspace() {
                   maxLength={1000}
                 />
                 <div className="dialog-actions">
-                  <Button type="submit" disabled={!verifiedEvidence.trim()}>
+                  <Button
+                    type="submit"
+                    disabled={applying || agentBusy || !verifiedEvidence.trim()}
+                  >
                     Review evidence proposal
                   </Button>
                 </div>
@@ -1969,7 +1938,12 @@ export function Workspace() {
                     .map((command) => (
                       <button
                         key={command}
-                        disabled={!active && !/theme|new resume/i.test(command)}
+                        disabled={
+                          (!active && !/theme|new resume/i.test(command)) ||
+                          (applying &&
+                            (command === "Save and compile" ||
+                              command === "Run ATS analysis"))
+                        }
                         onClick={() => {
                           setModal(null);
                           runCommand(command);
