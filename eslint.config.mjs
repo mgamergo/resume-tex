@@ -5,6 +5,7 @@ export default defineConfig([
   ...nextVitals,
   ...nextTs,
   globalIgnores([
+    "convex/_generated/**",
     ".next/**",
     ".tools/**",
     "artifacts/**",

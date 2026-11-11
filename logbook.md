@@ -1,5 +1,11 @@
 # Logbook
 
+## 2026-11-11 — Convex development typecheck
+
+- Reproduced TS2591 in auth.config.ts with Convex's separate TypeScript project. Track convex/tsconfig.json with explicit existing Node types so process.env resolves under TypeScript 6; no dependency or runtime changes.
+- Added the Convex project to the standard typecheck command. Ignore generated Convex bindings in Git and ESLint; preserve the local generated files.
+- Application and Convex typechecks, lint, formatting of changed config files, and all three Convex emulator tests pass. Configuration-only fix; no UI changes or Sol review needed. User requested committing local setup plus this fix and pushing main; remote previously had only dev.
+
 ## 2026-11-11 — Local workstation setup
 
 - Cloned origin/dev and created chore/local-setup. Installed frozen Bun dependencies, TinyTeX, Chromium, and repository-local Node 22.23.4. Ignored .env.local selects local/mock mode and PDF_NODE_BINARY. No system files or connected services changed.

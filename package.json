@@ -10,7 +10,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p convex/tsconfig.json",
     "test": "bun scripts/prepare-assets.ts && bun test tests/unit && vitest run tests/convex.test.ts",
     "test:e2e": "playwright test",
     "setup:tex": "bash scripts/setup-tex.sh",

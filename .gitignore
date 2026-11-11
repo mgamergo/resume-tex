@@ -16,3 +16,4 @@ public/pdf.worker.min.mjs
 /core.*
 
 /next-env.d.ts
+convex/_generated/
