@@ -4,7 +4,7 @@ import {
   revisionSchema,
   proposalSchema,
   revisionSummarySchema,
-} from "../core/schemas";
+} from "../../lib/core/schemas";
 import { z } from "zod";
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
@@ -20,8 +20,8 @@ import {
   type Revision,
   type RevisionSummary,
   type ResumeSummary,
-} from "../core/model";
-import { digest } from "../core/digest";
+} from "../../lib/core/model";
+import { digest } from "../../lib/core/digest";
 let database: Database.Database | undefined;
 function db() {
   if (database) return database;

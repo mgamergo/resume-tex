@@ -13,8 +13,6 @@ import {
   Redo2,
   Search,
   History,
-  Sun,
-  Moon,
   PanelRightClose,
   PanelRightOpen,
   Sparkles,
@@ -31,7 +29,9 @@ import {
   CheckCheck,
   BookOpen,
 } from "lucide-react";
-import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
+import { UserButton } from "@clerk/nextjs";
+import { useTheme } from "@/lib/client/theme";
+import { ThemeSelect } from "./theme-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -120,30 +120,12 @@ function IconButton({
     </Tooltip>
   );
 }
-function ConnectedAccount() {
-  const { isSignedIn } = useUser();
-  return isSignedIn ? (
-    <UserButton />
-  ) : (
-    <SignInButton mode="modal">
-      <Button variant="outline" size="sm">
-        Sign in
-      </Button>
-    </SignInButton>
-  );
-}
-export function Workspace({
-  mode,
-  assistantMode,
-}: {
-  mode: "local" | "connected";
-  assistantMode: "offline" | "configured";
-}) {
+export function Workspace() {
+  const { dark } = useTheme();
   const [resumes, setResumes] = useState<ResumeSummary[]>([]);
   const [active, setActive] = useState<Resume | null>(null);
   const [source, setSource] = useState("");
   const [engine, setEngine] = useState<Engine>("pdflatex");
-  const [dark, setDark] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -245,13 +227,7 @@ export function Workspace({
   }, [report]);
   useEffect(() => {
     queueMicrotask(() => void refresh());
-    const stored = localStorage.getItem("resume-tex-theme");
-    queueMicrotask(() => setDark(stored === "dark"));
   }, [refresh]);
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-    localStorage.setItem("resume-tex-theme", dark ? "dark" : "light");
-  }, [dark]);
   useEffect(() => {
     const unload = (event: BeforeUnloadEvent) => {
       if (dirty) {
@@ -338,8 +314,6 @@ export function Workspace({
               ? "saved"
               : "unsaved",
           );
-          if (draftRef.current.source === draft.source)
-            localStorage.removeItem(`resume-tex-draft-${doc.id}`);
           await reloadDetails(doc.id);
           if (forceCompile) await compileDocument(result.resume);
           return result.resume;
@@ -395,31 +369,6 @@ export function Workspace({
         setNotice("");
         setSaveState("saved");
         setMobileView("source");
-        const stored = localStorage.getItem(`resume-tex-draft-${id}`);
-        if (stored) {
-          const draft = z
-            .object({
-              source: z.string().max(160_000),
-              engine: z.enum(["pdflatex", "xelatex"]),
-              revision: z.number(),
-            })
-            .safeParse(JSON.parse(stored));
-          if (draft.success) {
-            if (draft.data.revision === doc.revision) {
-              setSource(draft.data.source);
-              setEngine(draft.data.engine);
-              draftRef.current = {
-                source: draft.data.source,
-                engine: draft.data.engine,
-              };
-              setNotice("Recovered your unsaved draft from this browser.");
-            } else {
-              setNotice(
-                "A recovered draft conflicts with a newer revision. It is kept in this browser; download it from the command menu before replacing it.",
-              );
-            }
-          }
-        }
         void compileDocument(doc);
       } catch (reason) {
         report(reason);
@@ -432,14 +381,6 @@ export function Workspace({
     setSource(value);
     draftRef.current = { source: value, engine: draftRef.current.engine };
     setSaveState("unsaved");
-    if (activeRef.current)
-      localStorage.setItem(
-        `resume-tex-draft-${activeRef.current.id}`,
-        JSON.stringify({
-          ...draftRef.current,
-          revision: activeRef.current.revision,
-        }),
-      );
   };
   const goHome = async () => {
     if (activeRef.current && !(await save(false))) return;
@@ -503,7 +444,6 @@ export function Workspace({
         id: active.id,
       });
       if (!isCurrent(id, session)) return;
-      localStorage.removeItem(`resume-tex-draft-${id}`);
       documentSession.current++;
       activeRef.current = null;
       setActive(null);
@@ -723,23 +663,13 @@ export function Workspace({
       setMobileView("agent");
     }
   };
-  const downloadSource = (recovered = false) => {
-    let text = source;
-    if (recovered && active) {
-      const stored = localStorage.getItem(`resume-tex-draft-${active.id}`);
-      if (stored) {
-        const parsed = z
-          .object({ source: z.string() })
-          .safeParse(JSON.parse(stored));
-        if (parsed.success) text = parsed.data.source;
-      }
-    }
+  const downloadSource = () => {
     const url = URL.createObjectURL(
-      new Blob([text], { type: "application/x-tex" }),
+      new Blob([source], { type: "application/x-tex" }),
     );
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = recovered ? "recovered-draft.tex" : "resume.tex";
+    anchor.download = "resume.tex";
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
@@ -748,9 +678,7 @@ export function Workspace({
     "Find in source",
     "Version history",
     "Download LaTeX source",
-    "Download recovered draft",
     "Run ATS analysis",
-    "Toggle theme",
     "New resume from template",
   ];
   const runCommand = (name: string) => {
@@ -768,14 +696,8 @@ export function Workspace({
       case "Download LaTeX source":
         downloadSource();
         break;
-      case "Download recovered draft":
-        downloadSource(true);
-        break;
       case "Run ATS analysis":
         void runAts();
-        break;
-      case "Toggle theme":
-        setDark((value) => !value);
         break;
       case "New resume from template":
         setModal("gallery");
@@ -847,14 +769,7 @@ export function Workspace({
         "No exact source match for that PDF text. Commands and ligatures can change its representation.",
       );
   };
-  const themeButton = (
-    <IconButton
-      label={dark ? "Use light theme" : "Use dark theme"}
-      onClick={() => setDark((value) => !value)}
-    >
-      {dark ? <Sun size={17} /> : <Moon size={17} />}
-    </IconButton>
-  );
+  const themeButton = <ThemeSelect />;
   return (
     <TooltipProvider>
       <div className={`app-shell ${active ? "is-editing" : ""}`}>
@@ -886,20 +801,14 @@ export function Workspace({
             <div className="sidebar-bottom">
               <div className="workspace-note">
                 <span className="status-dot" />
-                {mode === "local" ? "Local workspace" : "Connected workspace"}
-                <small>
-                  {mode === "local"
-                    ? "Stored on this server"
-                    : "Your private resume library"}
-                </small>
+                Private workspace
+                <small>Your resumes</small>
               </div>
               <div className="account-row">
-                <div className="avatar">{mode === "local" ? "L" : "R"}</div>
-                <span>
-                  {mode === "local" ? "Local author" : "Your account"}
-                </span>
+                <div className="avatar">R</div>
+                <span>Your account</span>
                 {themeButton}
-                {mode === "connected" && <ConnectedAccount />}
+                <UserButton />
               </div>
             </div>
           </aside>
@@ -1311,16 +1220,9 @@ export function Workspace({
                         <span className="assistant-symbol">
                           <Sparkles size={21} />
                         </span>
-                        <h2>A second pair of eyes.</h2>
-                        <p>
-                          Make a stronger draft while keeping every word yours.
-                          Review each change before it reaches your resume.
-                        </p>
-                        <Badge variant="outline">
-                          {assistantMode === "offline"
-                            ? "Offline · deterministic assistant"
-                            : "Configured AI provider"}
-                        </Badge>
+                        <h2>Assistant</h2>
+                        <p>Ask for a change, then review the diff.</p>
+                        <Badge variant="outline">Review before applying</Badge>
                       </div>
                       <div className="suggestion-grid">
                         <button
@@ -1685,10 +1587,7 @@ export function Workspace({
               </div>
               <footer className="workspace-footer">
                 <span>
-                  <span className="status-dot" />{" "}
-                  {mode === "local"
-                    ? "Private local workspace"
-                    : "Private connected workspace"}
+                  <span className="status-dot" /> Private workspace
                 </span>
                 <span>
                   Revision {active.revision}
@@ -1716,7 +1615,7 @@ export function Workspace({
                     Search commands<kbd>⌘ K</kbd>
                   </Button>
                   <span className="mobile-theme">{themeButton}</span>
-                  {mode === "connected" && <ConnectedAccount />}
+                  <UserButton />
                 </div>
               </header>
               <div className="dashboard-content">
@@ -1724,13 +1623,13 @@ export function Workspace({
                   <div>
                     <h1>
                       {dashboardTab === "templates"
-                        ? "A good place to begin."
-                        : "Make room for your next chapter."}
+                        ? "Templates"
+                        : "My resumes"}
                     </h1>
                     <p>
                       {dashboardTab === "templates"
-                        ? "Four carefully typeset starting points. Replace the fictional sample with your own story."
-                        : "Your experience, clearly told. Keep your resumes and their next drafts here."}
+                        ? "Choose a blank layout."
+                        : "Write and manage your resumes."}
                     </p>
                   </div>
                   <Button onClick={() => setModal("gallery")}>
@@ -1769,12 +1668,8 @@ export function Workspace({
                         <div className="empty-paper">
                           <FileText size={34} />
                         </div>
-                        <h2>Every next step starts with a draft.</h2>
-                        <p>
-                          Choose a template, bring your experience,
-                          <br />
-                          and make the details count.
-                        </p>
+                        <h2>Create your first resume</h2>
+                        <p>Choose a layout to start writing.</p>
                         <Button onClick={() => setModal("gallery")}>
                           <Plus size={16} />
                           Create your first resume
@@ -1824,12 +1719,12 @@ export function Workspace({
                       <h2>
                         {dashboardTab === "templates"
                           ? "Choose your layout"
-                          : "Start with a strong foundation"}
+                          : "Templates"}
                       </h2>
                       <p>
                         {dashboardTab === "templates"
-                          ? "Real LaTeX. Fully editable. Ready to compile."
-                          : "A few well-considered layouts, ready for your words."}
+                          ? "Blank LaTeX layouts, ready to edit."
+                          : "Start with a blank layout."}
                       </p>
                     </div>
                     {dashboardTab !== "templates" && (
@@ -2097,43 +1992,27 @@ function MiniPaper({ template }: { template: string }) {
   return (
     <div className={`mini-paper-preview mini-${template}`} aria-hidden="true">
       <div className="mini-paper">
-        <div className="mini-name">Alex Morgan</div>
-        <div className="mini-contact">Software Engineer · alex@example.com</div>
+        <div className="mini-name">
+          <i />
+        </div>
+        <div className="mini-contact">
+          <i />
+        </div>
         <div className="mini-columns">
           <div className="mini-main">
-            {["Experience", "Projects", "Education"].map((title, index) => (
-              <div className="mini-section" key={title}>
-                <strong>{title}</strong>
-                <b>
-                  {index === 0
-                    ? "Software Engineer"
-                    : index === 1
-                      ? "Open Source Issue Tracker"
-                      : "University of California"}
-                </b>
+            {[0, 1, 2].map((section) => (
+              <div className="mini-section" key={section}>
+                <strong />
                 <i />
                 <i />
                 <i className="short" />
-                {index === 0 && (
-                  <>
-                    <i />
-                    <i className="short" />
-                  </>
-                )}
               </div>
             ))}
           </div>
           <div className="mini-side">
             <div className="mini-section">
-              <strong>Skills</strong>
-              <b>TypeScript · React</b>
+              <strong />
               <i />
-              <i />
-              <i className="short" />
-            </div>
-            <div className="mini-section">
-              <strong>Education</strong>
-              <b>Computer Science</b>
               <i />
               <i className="short" />
             </div>

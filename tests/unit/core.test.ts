@@ -3,9 +3,9 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { LocalStore } from "../../lib/server/local-store";
+import { LocalStore } from "../fixtures/local-store";
 import { applyEdits } from "../../lib/core/model";
-import { templates } from "../../lib/core/templates";
+import { templates } from "../fixtures/templates";
 import { compile, readArtifact, sandboxArgs } from "../../lib/server/compiler";
 import { analyzePdf } from "../../lib/core/ats";
 import { extractPdf } from "../../lib/server/pdf-text";
@@ -13,7 +13,6 @@ import { buildProposal } from "../../lib/server/tools";
 let store: LocalStore;
 beforeAll(async () => {
   process.env.DATA_DIR = await mkdtemp(join(tmpdir(), "resume-tex-tests-"));
-  process.env.APP_MODE = "local";
   store = new LocalStore("test-owner");
 });
 describe("authoritative source and immutable history", () => {
