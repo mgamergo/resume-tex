@@ -1,10 +1,16 @@
 # Logbook
 
+## 2026-11-11 — Isolate test fixture storage
+
+- One focused tools-only unit run used the moved fixture's inherited .data default and added test document 2e790de2-0fe0-4d1b-a94b-1de48fd98260 under owner provider-race. The fixture now uses in-memory SQLite only, independent of DATA_DIR. Shared tenant/CAS/history tests remain intact.
+- Authorized cleanup checked the exact owner, name, timestamp, digest and full source before deleting that document and its two revisions in one transaction. No proposals existed. All unrelated row hashes match, both older provider-race records remain, and DB/WAL/SHM inodes are unchanged. PERSIST_WAL was verified on a temporary probe before use. Evidence: artifacts/refresh-sqlite-cleanup.json.
+- Real preview on port 3000 is restored through Infisical from stable build 8, with localhost origin and /usr/bin/node PDF worker. Latest targeted native-fetch run passed both previously failing browser cases. Sanitized service telemetry is retained for the final full gate; no historical reset is assigned a cause without a measured failure.
+
 ## 2026-11-11 — Upstream diagnostic checkpoint
 
-- The frozen9928aec driver passed format/types/lint/build,39Bun tests/228assertions, three Convex tests and nine of eleven real browser cases. Two remaining cases encountered actual upstream connection resets, so that driver is recorded as failed. No assertions or errors were suppressed to claim completion.
-- Added sanitized service/name/cause-code/duration telemetry around Clerk token issuance, Convex operations and model fetch. Native fetch remains unchanged; credentials, requests, headers and error messages are excluded. Sanitization regression and typecheck pass. The fresh-checkout browser setup now creates its ignored.data journal directory without deleting data.
-- A targeted ordinary-launch rerun passed the actual readonly/proposal workflow37.9s; complete evidence recapture and the final coherent gate follow. Historical reset attribution remains open until a measured failure or a clean final run.
+- The frozen 9928aec driver passed format/types/lint/build, 39 Bun tests / 228 assertions, three Convex tests and nine of eleven real browser cases. Two remaining cases encountered actual upstream connection resets, so that driver is recorded as failed. No assertions or errors were suppressed to claim completion.
+- Added sanitized service/name/cause-code/duration telemetry around Clerk token issuance, Convex operations and model fetch. Native fetch remains unchanged; credentials, requests, headers and error messages are excluded. Sanitization regression and typecheck pass. The fresh-checkout browser setup now creates its ignored .data journal directory without deleting data.
+- A targeted ordinary-launch rerun passed the actual readonly/proposal workflow in 37.9 seconds; complete evidence recapture and the final coherent gate follow. Historical reset attribution remains open until a measured failure or a clean final run.
 
 ## 2026-11-11 — Real editing and proposal review corrections
 

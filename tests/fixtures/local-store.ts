@@ -7,8 +7,6 @@ import {
 } from "../../lib/core/schemas";
 import { z } from "zod";
 import Database from "better-sqlite3";
-import { mkdirSync } from "node:fs";
-import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
   applyEdits,
@@ -25,10 +23,7 @@ import { digest } from "../../lib/core/digest";
 let database: Database.Database | undefined;
 function db() {
   if (database) return database;
-  const root = process.env.DATA_DIR ?? join(process.cwd(), ".data");
-  mkdirSync(root, { recursive: true, mode: 0o700 });
-  database = new Database(join(root, "workspace.sqlite"));
-  database.pragma("journal_mode = WAL");
+  database = new Database(":memory:");
   database.exec(
     "CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, owner TEXT NOT NULL, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS revisions (resume_id TEXT NOT NULL, owner TEXT NOT NULL, revision INTEGER NOT NULL, body TEXT NOT NULL, PRIMARY KEY(resume_id,revision)); CREATE TABLE IF NOT EXISTS proposals (id TEXT PRIMARY KEY, resume_id TEXT NOT NULL, owner TEXT NOT NULL, body TEXT NOT NULL);",
   );
