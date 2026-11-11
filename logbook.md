@@ -1,3 +1,8 @@
+# 2026-11-11 — Attribute explicit navigation image cancellation
+
+- The frozen fe4c622 gate passed every core check and 10 of 11 browser cases (4.8 minutes). Its only unexpected diagnostic was an already-inflight Clerk avatar image canceled by explicit reload; all 36 ready-authenticated screenshots and interaction assertions passed. Live known transport recovery was observed for Clerk (317 ms) and a Convex query (941 ms), with original failures and recovery logged.
+- Navigation attribution now additionally requires GET, resource type image, exact HTTPS img.clerk.com/default port and encoded avatar path, an already-recorded pre-navigation request, and exact ERR_ABORTED inside the existing bounded navigation window. Near misses remain rejected; every HTTP error and ordinary action failure remains unexpected. Production source is unchanged.
+
 # 2026-11-11 — Recover bounded reads without replaying writes
 
 - The next live gate passed 10 of 11 browser cases; only initial authenticated list loading hit a real Convex query deadline. All four templates, the apply-lock flow, async races and the 36-frame evidence matrix passed. No Clerk recovery was needed. This remains a failed complete gate.
