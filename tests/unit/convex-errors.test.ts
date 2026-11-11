@@ -20,7 +20,7 @@ test("expected structured Convex wire errors retain HTTP semantics while unknown
     expect(mapConvexError(error)?.status).toBe(status);
     expect(mapConvexError(error)?.message).toBe(message);
     await expect(
-      convexOperation(async () => {
+      convexOperation("query", async () => {
         throw error;
       }),
     ).rejects.toHaveProperty("status", status);
