@@ -4,6 +4,9 @@ export function reportUpstreamError(
   startedAt: number,
   context: {
     requestAborted?: boolean;
+    attempt?: 1 | 2;
+    transportFailure?: boolean;
+    outcome?: "retrying" | "exhausted" | "not_retried";
     operationKind?: "query" | "mutation";
   } = {},
 ) {
@@ -43,6 +46,9 @@ export function reportUpstreamError(
     JSON.stringify({
       event: context.requestAborted ? "request_cancelled" : "upstream_error",
       requestAborted: context.requestAborted ?? null,
+      attempt: context.attempt ?? null,
+      transportFailure: context.transportFailure ?? null,
+      outcome: context.outcome ?? null,
       operationKind: context.operationKind ?? null,
       service,
       elapsedMs: Date.now() - startedAt,

@@ -1,3 +1,8 @@
+# 2026-11-11 — Recover token transport once
+
+- Node candidate 31f2e32 passed all core checks and 10 of 11 live browser cases (4.4 minutes), including the prior Convex failure and the complete screenshot matrix. One ordinary workspace read failed before storage at Clerk token acquisition (20 ms, absent HTTP status, SDK unexpected_error, caller not aborted); this is retained as a failed gate.
+- Token acquisition now allows one 100 ms abortable retry on the same authenticated session only when a local classifier confirms exact known transport evidence. HTTP errors, rate limits, auth/configuration errors, unknown failures and caller aborts are never retried. No storage operation or model request is replayed. First failures and recovery/exhaustion are logged without messages or credentials. Focused success/exhaustion/no-retry/cancellation regressions pass; complete verification is pending.
+
 # 2026-11-11 — Bound real storage transport
 
 - The actual late-response flow that previously hung for 95 seconds passed under Node 22 in 25.5 seconds. Next dev/start now use Node while Bun remains the package manager and build/test runner; the complete candidate gate is pending.
