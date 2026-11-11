@@ -1,5 +1,15 @@
 # Logbook
 
+## 2026-11-11 — Complete v1 workspace and verification
+
+- Added the document dashboard/gallery, shadcn controls, LaTeX CodeMirror editor with macro completion/undo/find/diagnostics, resizable PDF split with actual canvas/selectable text, command menu, persisted theme, responsive tabs, source/PDF downloads, rename/delete and version restore. Four distinct template adaptations compile through the isolated runtime.
+- Added inline proposal review and exact highlights, accept/reject/undo, targeted ATS heading/column fixes and explicit author-evidence proposals. Fixed async document-session races with held real responses, monotonic proposal reconciliation, and source/engine/revision/JD freshness. A real tailoring test caught and fixed preamble macros being mistaken for bullets.
+- Fixed observed production origin normalization, PDF parser bundling/startup behavior, focus outlines/CTA color, dark syntax contrast and mobile zoom reachability. PDF worker failures now retain bounded sanitized diagnostics with code/signal. No live model or account result is fabricated.
+- Final `scripts/verify-local.sh` result is 0. `bun run format:check`, `lint`, `typecheck`, `test`, `build` and production `test:e2e` pass. Bun has 28 passing tests / 179 assertions; Convex emulator has 2 passing tests; Playwright has 4 passing Chromium flows with one worker. Every browser diagnostic list is empty, with no exclusions. Controlled server SIGTERM exits 143 in its shutdown log and the test command exits 0.
+- Browser evidence covers 1440x900, 768x1024, 390x844, dark/light, PDF zoom, agent diffs, actual ATS score/text, invalid compile retention, evidence insertion and cross-resume races. Screenshots were downloaded with digest checks and visually inspected. Authoritative reports are under ignored artifacts/; stale hidden reports are archived under artifacts/history/.
+- Human setup remains for real Clerk/Convex and LLM keys through the dedicated Infisical project. Actual MCP stdio and provider HTTP protocol were tested locally; Convex identity tests are emulator evidence, not a live account claim. V1 is a single-file Linux/Bun workspace; SyncTeX is replaced by explicitly approximate PDF text search. No publishing, merges or production service changes.
+- Parent owns the independent review and two Sol-loop passes after implementation handoff.
+
 ## 2026-11-11 — Assistant, PDF analysis and connected storage
 
 - Structured tools are shared by HTTP assistant and authenticated stdio MCP. Provider requests bind to the pre-request source digest; clients also supply their base digest. Exact range limits reject full rewrites. New numeric/known-skill claims require existing source or explicit author evidence. UI approval remains separate from MCP.

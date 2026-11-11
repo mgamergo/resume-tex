@@ -323,7 +323,7 @@ export function buildProposal(
     case "tailor_to_job": {
       const matches = [
         ...resume.source.matchAll(
-          /\\(?:resumeItem|item)(?:\{[^\n]+\}|[^\n]+)/g,
+          /^[ \t]*\\(?:resumeItem\{[^\n]+\}|item(?:\[[^\]\n]*\])?\s+[^\n]+)/gm,
         ),
       ];
       const terms = (

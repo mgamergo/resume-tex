@@ -215,3 +215,27 @@ test("new metrics require explicit author evidence rather than model invention",
     ).edits[0].replacement,
   ).toBe("Built 999");
 });
+test("job tailoring ignores macro definitions and reorders actual adjacent bullet evidence", async () => {
+  const { applyEdits } = await import("../../lib/core/model");
+  const { compile, readArtifact } = await import("../../lib/server/compiler");
+  const { extractPdf } = await import("../../lib/server/pdf-text");
+  const proposal = buildProposal(sample, {
+    tool: "tailor_to_job",
+    jobDescription: "Required React component testing and accessible workflows",
+  });
+  expect(proposal.edits[0].expected).not.toContain("newcommand");
+  const next = applyEdits(sample.source, proposal.edits);
+  expect(next.indexOf("Maintained React")).toBeLessThan(
+    next.indexOf("Built a TypeScript"),
+  );
+  expect(next).toContain("120 teammates");
+  expect(next).toContain("35\\%");
+  const compiled = await compile("tailoring", next, sample.engine);
+  if (!compiled.ok) throw Error(compiled.log);
+  const pdf = await extractPdf(
+    await readArtifact("tailoring", compiled.artifact),
+  );
+  expect(pdf.text.indexOf("Maintained React")).toBeLessThan(
+    pdf.text.indexOf("Built a TypeScript"),
+  );
+}, 15_000);

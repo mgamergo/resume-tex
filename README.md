@@ -4,7 +4,7 @@ A LaTeX resume workspace with an editor, real typeset PDF, reviewable editing as
 
 ## Run locally
 
-Requirements: Linux x86-64, Bun 1.4.4, Bubblewrap with unprivileged user/network/PID namespaces, `prlimit`, `curl`, `tar`, `xz`, `ldd`, and a system font directory. The setup script installs a **user-local** TeX distribution and copies a small runtime root. It does not install system packages. Allow about 1 GB for the toolchain. Unsupported sandboxing fails closed.
+Requirements: Linux x86-64, Bun 1.4.4, Node.js 22 at `/usr/bin/node`, Bubblewrap with unprivileged user/network/PID namespaces, `prlimit`, `curl`, `tar`, `xz`, `ldd`, and a system font directory. The setup script installs a **user-local** TeX distribution and copies a small runtime root. It does not install system packages. Allow about 1 GB for the toolchain. Unsupported sandboxing fails closed.
 
 ```sh
 bun install --frozen-lockfile

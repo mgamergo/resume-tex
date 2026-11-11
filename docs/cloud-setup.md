@@ -23,6 +23,8 @@ infisical secrets-manager run \
   --env=dev --path=/ -- bun run dev
 ```
 
+If an HTTPS reverse proxy serves connected mode, set `APP_ORIGIN` to the browser origin in Infisical. Origin checks compare against that configured value. Local mode remains loopback-only.
+
 Inject settings into builds too, because Next.js public variables are compiled into browser assets. Rebuild when those public settings change. Use the same project/environment scope for build and startup. Public client keys and deployment URLs are configuration, but private provider keys and Clerk server keys must remain server-only.
 
 Do not print environment variables or export secrets into Git. The compiler receives a separate clean environment and must never receive application credentials.

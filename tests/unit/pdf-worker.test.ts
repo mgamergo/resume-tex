@@ -5,6 +5,9 @@ test("PDF worker rejects oversized input, kills deadline work and recovers the q
   await expect(
     extractPdf(new Uint8Array(pdfExtractionPolicy.maxInputBytes + 1)),
   ).rejects.toThrow("input limit");
+  await expect(
+    extractPdf(new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55])),
+  ).rejects.toThrow("could not read");
   const previous = pdfExtractionPolicy.wallMs;
   try {
     pdfExtractionPolicy.wallMs = 1;

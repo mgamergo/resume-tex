@@ -39,59 +39,75 @@ export async function extractPdf(bytes: Uint8Array): Promise<PdfText> {
       openSync(output, "w", 0o600),
       openSync(errors, "w", 0o600),
     ];
-    const result = await new Promise<{ code: number | null; stopped: boolean }>(
-      (resolve, reject) => {
-        const child = spawn(
-          "/usr/bin/prlimit",
-          [
-            `--as=${pdfExtractionPolicy.memoryBytes}`,
-            "--cpu=6",
-            "--core=0",
-            "--nofile=64",
-            "--fsize=4194304",
-            "--",
-            "/usr/bin/node",
-            "--disable-wasm-trap-handler",
-            "--max-old-space-size=128",
-            "--max-semi-space-size=8",
-            join(process.cwd(), ".tools/pdf-worker.mjs"),
-          ],
-          {
-            env: {
-              NODE_ENV: "production",
-              UV_THREADPOOL_SIZE: "2",
-              RAYON_NUM_THREADS: "2",
-            },
-            stdio: descriptors,
-            detached: true,
+    const result = await new Promise<{
+      code: number | null;
+      signal: NodeJS.Signals | null;
+      stopped: boolean;
+    }>((resolve, reject) => {
+      const child = spawn(
+        "/usr/bin/prlimit",
+        [
+          `--as=${pdfExtractionPolicy.memoryBytes}`,
+          "--cpu=6",
+          "--core=0",
+          "--nofile=64",
+          "--fsize=4194304",
+          "--",
+          "/usr/bin/node",
+          "--disable-wasm-trap-handler",
+          "--max-old-space-size=128",
+          "--max-semi-space-size=8",
+          join(process.cwd(), ".tools/pdf-worker.mjs"),
+        ],
+        {
+          env: {
+            NODE_ENV: "production",
+            UV_THREADPOOL_SIZE: "2",
+            RAYON_NUM_THREADS: "2",
           },
-        );
-        for (const descriptor of descriptors) closeSync(descriptor);
-        let stopped = false;
-        const timer = setTimeout(() => {
-          stopped = true;
-          if (child.pid)
-            try {
-              process.kill(-child.pid, "SIGKILL");
-            } catch {
-              child.kill("SIGKILL");
-            }
-        }, pdfExtractionPolicy.wallMs);
-        child.once("error", (error) => {
-          clearTimeout(timer);
-          reject(error);
-        });
-        child.once("close", (code) => {
-          clearTimeout(timer);
-          resolve({ code, stopped });
-        });
-      },
-    );
+          stdio: descriptors,
+          detached: true,
+        },
+      );
+      for (const descriptor of descriptors) closeSync(descriptor);
+      let stopped = false;
+      const timer = setTimeout(() => {
+        stopped = true;
+        if (child.pid)
+          try {
+            process.kill(-child.pid, "SIGKILL");
+          } catch {
+            child.kill("SIGKILL");
+          }
+      }, pdfExtractionPolicy.wallMs);
+      child.once("error", (error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+      child.once("close", (code, signal) => {
+        clearTimeout(timer);
+        resolve({ code, signal, stopped });
+      });
+    });
+    if (result.stopped || result.code !== 0) {
+      const reason = (await readFile(errors, "utf8").catch(() => ""))
+        .slice(0, 1024)
+        .replace(/[\u0000-\u001f\u007f]/g, " ");
+      console.error(
+        JSON.stringify({
+          event: "pdf_worker_failed",
+          code: result.code,
+          signal: result.signal,
+          deadline: result.stopped,
+          reason,
+        }),
+      );
+    }
     if (result.stopped || result.code !== 0)
       throw new DomainError(
         result.stopped
           ? "PDF analysis stopped at its time or output limit."
-          : "PDF analysis failed within its resource limit. Simplify the document or review compile output.",
+          : "PDF analysis could not read this document. Review server diagnostics.",
         422,
       );
     if ((await stat(output)).size > pdfExtractionPolicy.maxOutputBytes)

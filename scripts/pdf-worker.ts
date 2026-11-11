@@ -9,6 +9,16 @@ try {
   }
   const result = await extractPdf(input);
   process.stdout.write(JSON.stringify(result));
-} catch {
+} catch (error) {
+  process.stderr.write(
+    JSON.stringify({
+      event: "pdf_extract_error",
+      name: error instanceof Error ? error.name : "UnknownError",
+      message:
+        error instanceof Error
+          ? error.message.slice(0, 1000)
+          : "Unknown PDF extraction failure",
+    }),
+  );
   process.exitCode = 1;
 }

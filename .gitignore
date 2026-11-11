@@ -12,5 +12,7 @@ tsconfig.tsbuildinfo
 public/pdf.worker.min.mjs
 .tools-setup.log
 *.log
-core
-core.*
+/core
+/core.*
+
+/next-env.d.ts
