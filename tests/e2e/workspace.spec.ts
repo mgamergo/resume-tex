@@ -196,6 +196,18 @@ test("360px compile remains named and keyboard-operable in both themes", async (
   for (const theme of ["light", "dark"]) {
     await page.getByLabel("Theme", { exact: true }).selectOption(theme);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const opener = page.getByRole("button", {
+        name: "Command menu (Ctrl+K)",
+        exact: true,
+      });
+      await opener.focus();
+      await page.keyboard.press("Enter");
+      await expect(page.getByLabel("Search commands")).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(opener).toBeFocused();
+    }
     await expect(compile.locator("span")).toBeHidden();
     await expect(compile).toHaveAccessibleName("Compile");
     await expect(compile).toBeEnabled();
