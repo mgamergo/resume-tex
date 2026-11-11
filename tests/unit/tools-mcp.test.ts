@@ -239,3 +239,31 @@ test("job tailoring ignores macro definitions and reorders actual adjacent bulle
     pdf.text.indexOf("Built a TypeScript"),
   );
 }, 15_000);
+
+test("skill claims use token boundaries in both proposals and supporting evidence", () => {
+  const start = sample.source.indexOf("Built a");
+  const call = {
+    tool: "rewrite_bullet" as const,
+    start,
+    end: start + 7,
+    replacement: "Supported ongoing review and trust",
+  };
+  expect(() => buildProposal(sample, call)).not.toThrow();
+  for (const skill of ["Go", "Rust"]) {
+    expect(() =>
+      buildProposal(sample, { ...call, replacement: "Used " + skill }),
+    ).toThrow("unsupported skill");
+    expect(() =>
+      buildProposal(
+        { ...sample, source: sample.source + "\n% ongoing review and trust" },
+        { ...call, replacement: "Used " + skill },
+      ),
+    ).toThrow("unsupported skill");
+    expect(() =>
+      buildProposal(
+        { ...sample, source: sample.source + "\n% Verified skill: " + skill },
+        { ...call, replacement: "Used " + skill },
+      ),
+    ).not.toThrow();
+  }
+});

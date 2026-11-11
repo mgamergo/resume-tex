@@ -14,6 +14,8 @@ import { v } from "convex/values";
 import { z } from "zod";
 import {
   applyEdits,
+  DomainError,
+  type Edit,
   engineSchema,
   proposalInputSchema,
   sourceSchema,
@@ -82,6 +84,20 @@ async function get(ctx: Ctx, owner: string, id: string): Promise<Resume> {
       message: "Resume not found",
     });
   return resumeSchema.parse(JSON.parse(value.body));
+}
+function validatedEdits(source: string, edits: Edit[]) {
+  try {
+    return applyEdits(source, edits);
+  } catch (error) {
+    if (error instanceof DomainError)
+      throw new ConvexError({
+        kind: "resume-tex",
+        status: error.status,
+        code: "conflict",
+        message: error.message,
+      });
+    throw error;
+  }
 }
 async function hash(source: string) {
   return Array.from(
@@ -272,7 +288,7 @@ export const write = mutation({
           code: "conflict",
           message: "Stale proposal",
         });
-      applyEdits(current.source, proposalInput.edits);
+      validatedEdits(current.source, proposalInput.edits);
       const proposal: Proposal = {
         ...proposalInput,
         id: crypto.randomUUID(),
@@ -319,7 +335,7 @@ export const write = mutation({
             code: "conflict",
             message: "Stale proposal",
           });
-        const source = applyEdits(current.source, proposal.edits);
+        const source = validatedEdits(current.source, proposal.edits);
         const next = {
           ...current,
           source,

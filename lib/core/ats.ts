@@ -119,7 +119,7 @@ export function stem(term: string) {
     .replace(/(?:tion|ment)$/u, "");
 }
 const normalize = (text: string) => text.toLowerCase().replace(/[‐‑–—]/g, "-");
-function contains(text: string, term: string) {
+export function containsSkill(text: string, term: string) {
   return new RegExp(
     `(^|[^a-z0-9])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`,
     "i",
@@ -152,8 +152,10 @@ export function keywordsFor(text: string, jd: string): Keyword[] {
       return (requirementContext ? "required " : "") + lower;
     })
     .filter((line) => line.trim());
-  const tokens = documents.map(
-    (line) => line.match(/[a-z][a-z0-9+#.-]*/g) ?? [],
+  const tokens = documents.map((line) =>
+    (line.match(/[a-z][a-z0-9+#.-]*/g) ?? []).map((token) =>
+      token.replace(/[.-]+$/, ""),
+    ),
   );
   const avg =
     tokens.reduce((sum, terms) => sum + terms.length, 0) /
@@ -161,8 +163,8 @@ export function keywordsFor(text: string, jd: string): Keyword[] {
   const candidates = new Set(
     skills.filter(
       (skill) =>
-        contains(jd, skill) ||
-        (synonyms[skill] ?? []).some((alias) => contains(jd, alias)),
+        containsSkill(jd, skill) ||
+        (synonyms[skill] ?? []).some((alias) => containsSkill(jd, alias)),
     ),
   );
   const frequency = new Map<string, number>();
@@ -178,14 +180,16 @@ export function keywordsFor(text: string, jd: string): Keyword[] {
     candidates.add(token);
   const lower = normalize(text);
   const sourceTerms = new Set(
-    (lower.match(/[a-z][a-z0-9+#.-]*/g) ?? []).map(stem),
+    (lower.match(/[a-z][a-z0-9+#.-]*/g) ?? []).map((token) =>
+      stem(token.replace(/[.-]+$/, "")),
+    ),
   );
   return [...candidates]
     .map((term) => {
       const relevant = documents.filter(
         (line) =>
-          contains(line, term) ||
-          (synonyms[term] ?? []).some((alias) => contains(line, alias)),
+          containsSkill(line, term) ||
+          (synonyms[term] ?? []).some((alias) => containsSkill(line, alias)),
       );
       const required =
         relevant.some((line) =>
@@ -199,16 +203,16 @@ export function keywordsFor(text: string, jd: string): Keyword[] {
       const bm25 = tokens.reduce((sum, list, index) => {
         const tf =
           list.filter((token) => stem(token) === stem(term)).length ||
-          (contains(documents[index], term) ? 1 : 0);
+          (containsSkill(documents[index], term) ? 1 : 0);
         return (
           sum +
           (idf * (tf * 2.2)) /
             (tf + 1.2 * (0.25 + (0.75 * list.length) / Math.max(avg, 1)))
         );
       }, 0);
-      const exact = contains(lower, term);
+      const exact = containsSkill(lower, term);
       const synonym = (synonyms[term] ?? []).some((alias) =>
-        contains(lower, alias),
+        containsSkill(lower, alias),
       );
       const stemmed = sourceTerms.has(stem(term));
       const method = exact

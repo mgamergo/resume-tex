@@ -1,4 +1,4 @@
-import { knownSkills } from "../core/ats";
+import { knownSkills, containsSkill } from "../core/ats";
 import { z } from "zod";
 import {
   DomainError,
@@ -76,8 +76,8 @@ function ensureFacts(
   for (const edit of proposal.edits) {
     for (const skill of knownSkills)
       if (
-        edit.replacement.toLowerCase().includes(skill) &&
-        !evidenceSource.toLowerCase().includes(skill)
+        containsSkill(edit.replacement, skill) &&
+        !containsSkill(evidenceSource, skill)
       )
         throw new DomainError(
           `This edit introduces an unsupported skill (${skill}). Add your verified evidence to the source first.`,

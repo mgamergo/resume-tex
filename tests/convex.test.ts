@@ -3,6 +3,7 @@ import { defineTestApp } from "convex-test";
 import schema from "../convex/schema";
 import * as workspace from "../convex/workspace";
 import { templates } from "../lib/core/templates";
+import { mapConvexError } from "../lib/server/convex-errors";
 import { resumeSchema, proposalSchema } from "../lib/core/schemas";
 const app = defineTestApp({ schema }).defineModules({ workspace });
 describe("Convex authenticated storage", () => {
@@ -103,6 +104,42 @@ describe("Convex authenticated storage", () => {
       }),
     ).rejects.toThrow("Stale proposal");
     expect(newer.revision).toBe(3);
+  });
+  it("invalid exact edits retain actionable conflict semantics across the Convex boundary", async () => {
+    const owner = app.createTest().withIdentity({ subject: "edit-owner" });
+    const template = templates[0];
+    const doc = resumeSchema.parse(
+      await owner.mutation(app.api.workspace.write, {
+        op: "create",
+        payload: JSON.stringify({
+          name: "Conflict",
+          source: template.source,
+          engine: template.engine,
+          template: template.id,
+        }),
+      }),
+    );
+    let failure: unknown;
+    try {
+      await owner.mutation(app.api.workspace.write, {
+        op: "propose",
+        payload: JSON.stringify({
+          id: doc.id,
+          input: {
+            baseDigest: doc.digest,
+            title: "Exact edit",
+            explanation: "",
+            evidenceNeeded: [],
+            edits: [{ start: 0, end: 1, expected: "wrong", replacement: "x" }],
+          },
+        }),
+      });
+    } catch (error) {
+      failure = error;
+    }
+    const mapped = mapConvexError(failure);
+    expect(mapped?.status).toBe(409);
+    expect(mapped?.message).toContain("range no longer matches");
   });
   it("bounds history and lists only resumes independently of full-source version count", async () => {
     const t = app.createTest();

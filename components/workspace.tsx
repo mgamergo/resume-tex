@@ -161,6 +161,8 @@ export function Workspace({
     engine: Engine;
   } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [applying, setApplyingState] = useState(false);
+  const applyingRef = useRef(false);
   const [saveState, setSaveState] = useState<
     "saved" | "unsaved" | "saving" | "error"
   >("saved");
@@ -185,6 +187,11 @@ export function Workspace({
   const documentSession = useRef(0);
   const editor = useRef<EditorHandle>(null);
   const activeRef = useRef(active);
+  const setApplying = useCallback((value: boolean) => {
+    applyingRef.current = value;
+    setApplyingState(value);
+    editor.current?.setReadOnly(value);
+  }, []);
   const draftRef = useRef({ source, engine });
   const savePromise = useRef<Promise<Resume | null> | null>(null);
   const compileSequence = useRef(0);
@@ -345,12 +352,12 @@ export function Workspace({
     saveLatest.current = save;
   }, [save]);
   useEffect(() => {
-    if (!active || !dirty) return;
+    if (!active || !dirty || applying) return;
     const timer = setTimeout(() => {
       void saveLatest.current(true);
     }, 1100);
     return () => clearTimeout(timer);
-  }, [source, engine, active, dirty]);
+  }, [source, engine, active, dirty, applying]);
   const loadDocument = useCallback(
     async (id: string) => {
       if (activeRef.current && !(await saveLatest.current(false))) return;
@@ -362,6 +369,7 @@ export function Workspace({
         setHistory(detail.history);
         setProposals(detail.proposals);
         setAgentBusy(false);
+        setApplying(false);
         setAtsBusy(false);
         setAgentMessage("");
         activeRef.current = doc;
@@ -406,9 +414,10 @@ export function Workspace({
         report(reason);
       }
     },
-    [compileDocument, reloadDetails, report],
+    [compileDocument, reloadDetails, report, setApplying],
   );
   const changeSource = (value: string) => {
+    if (applyingRef.current) return;
     setSource(value);
     draftRef.current = { source: value, engine: draftRef.current.engine };
     setSaveState("unsaved");
@@ -495,10 +504,12 @@ export function Workspace({
     }
   };
   const restore = async (revision: number) => {
+    if (applyingRef.current) return;
     const session = documentSession.current;
-    const doc = await save(false);
-    if (!doc || !isCurrent(doc.id, session)) return;
+    setApplying(true);
     try {
+      const doc = await save(false);
+      if (!doc || !isCurrent(doc.id, session)) return;
       const result = await api("/api/workspace", documentResponse, {
         op: "restore",
         id: doc.id,
@@ -523,7 +534,9 @@ export function Workspace({
       );
       await compileDocument(result.resume);
     } catch (reason) {
-      if (isCurrent(doc.id, session)) report(reason);
+      if (session === documentSession.current) report(reason);
+    } finally {
+      if (session === documentSession.current) setApplying(false);
     }
   };
   const askAgent = async (
@@ -568,10 +581,12 @@ export function Workspace({
     }
   };
   const decide = async (proposal: Proposal, accept: boolean) => {
+    if (applyingRef.current) return;
     const session = documentSession.current;
-    const doc = await save(false);
-    if (!doc || !isCurrent(doc.id, session)) return;
+    setApplying(true);
     try {
+      const doc = await save(false);
+      if (!doc || !isCurrent(doc.id, session)) return;
       const result = await api("/api/workspace", documentResponse, {
         op: "decide",
         id: doc.id,
@@ -601,7 +616,9 @@ export function Workspace({
       }
       await reloadDetails(doc.id);
     } catch (reason) {
-      if (isCurrent(doc.id, session)) report(reason);
+      if (session === documentSession.current) report(reason);
+    } finally {
+      if (session === documentSession.current) setApplying(false);
     }
   };
   const runAts = async () => {
@@ -728,7 +745,7 @@ export function Workspace({
   const runCommand = (name: string) => {
     switch (name) {
       case "Save and compile":
-        void save(true);
+        if (!applyingRef.current) void save(true);
         break;
       case "Find in source":
         editor.current?.find();
@@ -761,7 +778,7 @@ export function Workspace({
       }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        void saveLatest.current(true);
+        if (!applyingRef.current) void saveLatest.current(true);
       }
     };
     window.addEventListener("keydown", handler);
@@ -939,7 +956,7 @@ export function Workspace({
                   <Button
                     className="compile-button"
                     onClick={() => void save(true)}
-                    disabled={busy || saveState === "saving"}
+                    disabled={applying || busy || saveState === "saving"}
                   >
                     {busy ? (
                       <LoaderCircle size={14} className="spin" />
@@ -1032,12 +1049,14 @@ export function Workspace({
                       <div>
                         <IconButton
                           label="Undo source edit"
+                          disabled={applying}
                           onClick={() => editor.current?.undo()}
                         >
                           <Undo2 size={14} />
                         </IconButton>
                         <IconButton
                           label="Redo source edit"
+                          disabled={applying}
                           onClick={() => editor.current?.redo()}
                         >
                           <Redo2 size={14} />
@@ -1050,6 +1069,7 @@ export function Workspace({
                         </IconButton>
                         <select
                           aria-label="LaTeX engine"
+                          disabled={applying}
                           value={engine}
                           onChange={(event) => {
                             const next =
@@ -1070,10 +1090,13 @@ export function Workspace({
                       </div>
                     </div>
                     <SourceEditor
+                      key={active.id}
                       ref={editor}
                       value={source}
                       onChange={changeSource}
-                      onSave={() => void save(true)}
+                      onSave={() => {
+                        if (!applyingRef.current) void save(true);
+                      }}
                       dark={dark}
                       diagnostics={compileResult?.diagnostics ?? []}
                       edits={pending
@@ -1081,7 +1104,9 @@ export function Workspace({
                         .flatMap((p) => p.edits)}
                     />
                     <footer className="source-footer">
-                      <span>LaTeX · UTF-8</span>
+                      <span>
+                        {applying ? "Applying changes…" : "LaTeX · UTF-8"}
+                      </span>
                       <button onClick={() => setShowLog((value) => !value)}>
                         {compileResult && !compileResult.ok ? (
                           <>
@@ -1402,6 +1427,7 @@ export function Workspace({
                               <Button
                                 size="sm"
                                 disabled={
+                                  applying ||
                                   proposal.baseDigest !== active.digest ||
                                   dirty ||
                                   proposal.evidenceNeeded.length > 0
@@ -1999,7 +2025,7 @@ export function Workspace({
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={item.revision === active?.revision}
+                      disabled={applying || item.revision === active?.revision}
                       onClick={() => void restore(item.revision)}
                     >
                       Restore

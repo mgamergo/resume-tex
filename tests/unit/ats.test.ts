@@ -134,3 +134,20 @@ test.each(["Nice to have", "Nice-to-have", "Nice‑to‑haves:"])(
     );
   },
 );
+
+test("sentence punctuation does not create duplicate missing terms or break internal technical punctuation", () => {
+  for (const [text, jd] of [
+    ["React", "Required React."],
+    ["Node.js C++ C#", "Required Node.js, C++ and C#."],
+  ]) {
+    const keywords = keywordsFor(text, jd);
+    expect(keywords.every((keyword) => keyword.matched)).toBe(true);
+    expect(new Set(keywords.map((keyword) => keyword.term)).size).toBe(
+      keywords.length,
+    );
+    expect(keywords.some((keyword) => keyword.term.endsWith("."))).toBe(false);
+  }
+  expect(
+    keywordsFor("React", "Required React.").map((keyword) => keyword.term),
+  ).toEqual(["react"]);
+});

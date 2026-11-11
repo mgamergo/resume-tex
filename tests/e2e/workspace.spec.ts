@@ -602,3 +602,94 @@ test("late assistant, acceptance and ATS responses cannot replace another open r
   await expect(page.locator(".textLayer")).toContainText("B Person");
   expect(errors).toEqual([]);
 });
+
+test("same-resume apply locks prevent lost typing and new resumes have independent undo history", async ({
+  page,
+}) => {
+  const errors = attachDiagnostics(page);
+  await page.goto("/");
+  const doc = await newResume(page, "Jake's Resume");
+  const source = page.getByRole("textbox", { name: "LaTeX source" });
+  await page.getByRole("button", { name: "Tighten a bullet" }).click();
+  await expect(
+    page.getByRole("button", { name: "Accept", exact: true }),
+  ).toBeVisible();
+  for (const operation of ["decide", "restore"]) {
+    let readyResolve: () => void = () => {};
+    let releaseResolve: () => void = () => {};
+    const ready = new Promise<void>((resolve) => {
+      readyResolve = resolve;
+    });
+    const release = new Promise<void>((resolve) => {
+      releaseResolve = resolve;
+    });
+    const handler = async (route: import("@playwright/test").Route) => {
+      if (route.request().postDataJSON()?.op !== operation) {
+        await route.continue();
+        return;
+      }
+      const response = await route.fetch();
+      readyResolve();
+      await release;
+      await route.fulfill({ response });
+    };
+    await page.route("**/api/workspace", handler);
+    try {
+      if (operation === "decide")
+        await page.getByRole("button", { name: "Accept", exact: true }).click();
+      else {
+        await page.getByLabel("Version history", { exact: true }).click();
+        await page
+          .locator(".history-list article")
+          .filter({ has: page.getByText("Revision 1", { exact: true }) })
+          .getByRole("button", { name: "Restore", exact: true })
+          .click();
+      }
+      await ready;
+      if (operation === "restore") await page.keyboard.press("Escape");
+      await expect(source).toHaveAttribute("contenteditable", "false");
+      await expect(
+        page.getByLabel("LaTeX engine", { exact: true }),
+      ).toBeDisabled();
+      await expect(
+        page.getByLabel("Undo source edit", { exact: true }),
+      ).toBeDisabled();
+      await source.evaluate((element) => element.focus());
+      await page.keyboard.type("SHOULD_NOT_OVERWRITE");
+      await expect(source).not.toContainText("SHOULD_NOT_OVERWRITE");
+      await page.screenshot({ path: `artifacts/apply-lock-${operation}.png` });
+      releaseResolve();
+      await expect(source).toHaveAttribute("contenteditable", "true");
+      const expected =
+        operation === "decide"
+          ? "Built a service-health dashboard"
+          : "Built a TypeScript dashboard";
+      await expect(source).toContainText(expected);
+      const detail = await (
+        await page.request.get(`/api/workspace?id=${doc.id}`)
+      ).json();
+      expect(resumeSchema.parse(detail.resume).source).toContain(expected);
+    } finally {
+      releaseResolve();
+      await page.unroute("**/api/workspace", handler);
+    }
+  }
+  await source.fill(
+    doc.source.replace("Alex Morgan", "Private Previous Resume"),
+  );
+  await page.keyboard.press("Control+s");
+  await expect(page.locator(".textLayer")).toContainText(
+    "Private Previous Resume",
+  );
+  await page.keyboard.press("Control+k");
+  await page
+    .getByRole("button", { name: "New resume from template", exact: true })
+    .click();
+  await page.getByRole("dialog").getByRole("button", { name: /Deedy/ }).click();
+  await expect(page.locator(".document-name")).toContainText("Deedy");
+  await expect(source).toContainText("\\selectfont Alex");
+  await page.getByLabel("Undo source edit", { exact: true }).click();
+  await expect(source).toContainText("\\selectfont Alex");
+  await expect(source).not.toContainText("Private Previous Resume");
+  expect(errors).toEqual([]);
+});

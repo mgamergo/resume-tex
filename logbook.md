@@ -1,5 +1,12 @@
 # Logbook
 
+## 2026-11-11 — Functionality Sol corrections
+
+- Sol round 1 found six concrete issues. Created generated public assets on fresh checkout; locked source/engine/undo during accept and restore before awaiting; keyed editor history by resume; normalized terminal keyword punctuation; used token boundaries for skill claims and evidence; preserved exact-range conflict semantics across Convex. All findings accepted and corrected with focused regression coverage.
+- The new browser case holds real accept/restore responses, attempts typing, checks stored source and unlock, then creates Deedy through the command menu and verifies Undo cannot restore another resume's private content. Its first run exposed a test expectation that ignored Deedy's surname macro; corrected that source assertion without removing the private-content check. Four existing browser cases passed on that run.
+- Full verification after corrections passed: formatting, types, lint, production build, 34 Bun tests/208 assertions, three Convex emulator tests, five production Chromium cases (45.8 seconds). All seven browser diagnostic arrays are empty. The generated public directory is tested from a fresh temporary working directory.
+- Current behavior awaits functionality Sol recheck, then the separate UI/UX pass. No push during the review loop. Live account/model setup remains unverified and documented.
+
 ## 2026-11-11 — Independent verification and final corrections
 
 - Parent accepted exclusive ownership at pushed fc1dfea. An independent full driver passed format, lint, types, build, 31 Bun tests/185 assertions, two Convex emulator tests and all four production Chromium cases; mobile history and source-download controls were exercised at 768/390 widths. Diagnostics remained empty.

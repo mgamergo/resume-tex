@@ -49,6 +49,7 @@ import type { Diagnostic } from "@/lib/server/compiler";
 import type { Edit } from "@/lib/core/model";
 export type EditorHandle = {
   jump: (line: number) => void;
+  setReadOnly: (value: boolean) => void;
   undo: () => void;
   redo: () => void;
   find: () => void;
@@ -140,6 +141,7 @@ const theme = EditorView.theme({
   ".cm-foldPlaceholder": { background: "transparent" },
 });
 const darkCompartment = new Compartment();
+const readOnlyCompartment = new Compartment();
 function latexComplete(context: CompletionContext) {
   const word = context.matchBefore(/\\[a-zA-Z]*/);
   if (!word) return null;
@@ -185,6 +187,14 @@ export const SourceEditor = forwardRef<
   useImperativeHandle(
     ref,
     () => ({
+      setReadOnly(value) {
+        view.current?.dispatch({
+          effects: readOnlyCompartment.reconfigure([
+            EditorState.readOnly.of(value),
+            EditorView.editable.of(!value),
+          ]),
+        });
+      },
       jump(line) {
         const editor = view.current;
         if (!editor) return;
@@ -222,6 +232,10 @@ export const SourceEditor = forwardRef<
   useEffect(() => {
     if (!target.current) return;
     const extensions: Extension[] = [
+      readOnlyCompartment.of([
+        EditorState.readOnly.of(false),
+        EditorView.editable.of(true),
+      ]),
       lineNumbers(),
       highlightActiveLineGutter(),
       highlightActiveLine(),
