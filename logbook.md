@@ -1,5 +1,10 @@
 # Logbook
 
+## 2026-11-11 — Imported resume fullpage support
+
+- Added TeX Live `preprint` to trusted setup; CTAN confirms it supplies `fullpage.sty`. Keeping the original package preserves imported resume margins instead of rewriting source. Runtime remains offline; other unprovisioned packages may still need explicit setup additions.
+- Re-ran local TeX setup and refreshed ignored toolchain manifests. A sandboxed pdfLaTeX document using fullpage[empty] and titlesec produced a one-page PDF successfully. All eight core tests (80 assertions), ESLint and shell syntax checks pass. Configuration-only change; no UI changes or Sol loop required.
+
 ## 2026-11-11 — Convex development typecheck
 
 - Reproduced TS2591 in auth.config.ts with Convex's separate TypeScript project. Track convex/tsconfig.json with explicit existing Node types so process.env resolves under TypeScript 6; no dependency or runtime changes.
