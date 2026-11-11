@@ -1,5 +1,10 @@
 # Logbook
 
+## 2026-11-11 — Babel English for imported resumes
+
+- Provision `babel-english`, the separate TeX Live package supplying english.ldf; installed locally and refreshed toolchain manifests. Preserve existing source language settings instead of removing Babel. Other languages still require explicit provisioning.
+- Sandboxed pdfLaTeX produced a one-page PDF with all packages shown in the reported preamble, including fullpage and Babel English. All eight core tests (80 assertions), ESLint and shell syntax checks pass. Configuration-only fix; no UI changes or Sol loop needed.
+
 ## 2026-11-11 — Imported resume fullpage support
 
 - Added TeX Live `preprint` to trusted setup; CTAN confirms it supplies `fullpage.sty`. Keeping the original package preserves imported resume margins instead of rewriting source. Runtime remains offline; other unprovisioned packages may still need explicit setup additions.
