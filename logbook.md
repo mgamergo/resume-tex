@@ -1,5 +1,13 @@
 # Logbook
 
+## 2026-11-11 — Real editing and proposal review corrections
+
+- Real service tests reproduced a connected save failure: transport op leaked into strict Convex save input. Projected domain fields at the route boundary. Clerk sessions, tenant isolation, CAS409, source/PDF ownership and signout state clearing now pass against the actual services.
+- The real model sometimes miscounted offsets. Its private wire format now selects unique exact source text in the immutable pre-request snapshot; JavaScript derives UTF-16 ranges. Empty, missing, duplicate and overlapping selections fail. Public tool/MCP ranges, digest/CAS checks and explicit review remain unchanged. Unicode and conflict regressions pass.
+- Held actual accept/restore/reject responses exposed enabled assistant/ATS actions whose apply guard silently ignored clicks. Their disabled states now match the guard, with deterministic browser regression coverage. Mobile header control bounds and document-name ellipsis fix an observed clipped PDF action. Cut repeated dashboard, assistant, ATS and sign-in copy.
+- Real browser tests create marked disposable Clerk users with short-lived sign-in tickets. Cleanup uses their verified Clerk session JWT and Convex identity, records IDs/runIds in an ignored journal, and never persists tokens. Two identities stranded by early failed cleanup were recovered by their exact test markers and removed with their own documents.
+- Targeted theme checks passed; the latest three-case run passed template/responsive49.9s, compile/ATS/evidence31.7s and all36light/dark desktop/tablet/mobile captures. A temporary real-fetch observer saw no failures in that run. Earlier upstream resets and controller disconnects remain archived; neither Node nor Bun alone explains them. Ordinary Bun launch is restored for the final coherent verification. External authenticated MCP e2e remains intentionally skipped.
+
 ## 2026-11-11 — Real-service workspace and blank starters
 
 - Removed production local/mock modes, SQLite implementation and browser draft persistence/recovery; fixtures now live only under tests. All requests require Clerk; Convex derives ownership from the JWT. Auth gate waits for loaded sign-in and keys editor state by user ID. Existing disk databases/browser keys are untouched and not migrated.

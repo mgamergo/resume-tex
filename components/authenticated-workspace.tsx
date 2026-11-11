@@ -13,8 +13,7 @@ export function AuthenticatedWorkspace() {
         <ThemeSelect />
       </header>
       <section>
-        <h1>Your resume, in LaTeX.</h1>
-        <p>Write, preview, and review every change.</p>
+        <h1>Sign in to Resume TeX</h1>
         {isLoaded ? (
           <SignInButton mode="modal">
             <Button>Sign in</Button>

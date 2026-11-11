@@ -1,36 +1,101 @@
-import { test, expect, type Page } from "@playwright/test";
+import {
+  test,
+  expect,
+  type Page,
+  type Request as BrowserRequest,
+} from "@playwright/test";
 import { z } from "zod";
 import { resumeSchema } from "../../lib/core/schemas";
+import { signIn, cleanup, sanitize } from "./connected";
+import { templates as fixtures } from "../fixtures/templates";
 import { readFile, writeFile } from "node:fs/promises";
+test.use({ video: "on" });
 let latestDiagnostics: string[] = [];
-test.afterEach(async ({}, testInfo) => {
-  await writeFile(
-    `artifacts/diagnostics-${testInfo.title.slice(0, 20).replace(/[^a-z0-9]/gi, "-")}.json`,
-    JSON.stringify(latestDiagnostics, null, 2),
-  );
-});
-function attachDiagnostics(page: Page) {
-  const diagnostics: string[] = [];
-  latestDiagnostics = diagnostics;
+type NavigationDiagnostics = {
+  inflight: Set<BrowserRequest>;
+  leaving: Set<BrowserRequest> | null;
+  cancellations: string[];
+};
+const navigationDiagnostics = new WeakMap<Page, NavigationDiagnostics>();
+test.beforeEach(async ({ page }) => {
+  const errors: string[] = [];
+  latestDiagnostics = errors;
   page.on("console", (message) => {
     if (message.type() === "error")
-      diagnostics.push(`console: ${message.text()}`);
+      errors.push(sanitize(`console: ${message.text()}`));
   });
   page.on("pageerror", (error) =>
-    diagnostics.push(
-      `pageerror: ${error.name}: ${error.message}\n${error.stack ?? ""}`,
-    ),
+    errors.push(sanitize(`pageerror: ${error.name}: ${error.message}`)),
   );
-  page.on("requestfailed", (request) =>
-    diagnostics.push(
-      `requestfailed: ${request.url()} ${request.failure()?.errorText}`,
-    ),
-  );
+  const navigation: NavigationDiagnostics = {
+    inflight: new Set(),
+    leaving: null,
+    cancellations: [],
+  };
+  navigationDiagnostics.set(page, navigation);
+  page.on("request", (request) => navigation.inflight.add(request));
+  page.on("requestfinished", (request) => navigation.inflight.delete(request));
+  page.on("requestfailed", (request) => {
+    const failure = request.failure()?.errorText;
+    const message = sanitize(`requestfailed: ${request.url()} ${failure}`);
+    if (
+      navigation.leaving?.has(request) &&
+      request.method() === "GET" &&
+      new URL(request.url()).pathname === "/api/workspace" &&
+      failure === "net::ERR_ABORTED"
+    )
+      navigation.cancellations.push(message);
+    else errors.push(message);
+    navigation.inflight.delete(request);
+  });
   page.on("response", (response) => {
     if (response.status() >= 400)
-      diagnostics.push(`http: ${response.status()} ${response.url()}`);
+      errors.push(sanitize(`http: ${response.status()} ${response.url()}`));
   });
-  return diagnostics;
+  await signIn(page);
+});
+test.afterEach(async ({ page }, testInfo) => {
+  try {
+    await cleanup(page);
+  } finally {
+    await writeFile(
+      `artifacts/navigation-cancellations-${testInfo.title.slice(0, 20).replace(/[^a-z0-9]/gi, "-")}.json`,
+      JSON.stringify(
+        navigationDiagnostics.get(page)?.cancellations ?? [],
+        null,
+        2,
+      ),
+    );
+    await writeFile(
+      `artifacts/diagnostics-${testInfo.title.slice(0, 20).replace(/[^a-z0-9]/gi, "-")}.json`,
+      JSON.stringify(latestDiagnostics, null, 2),
+    );
+  }
+});
+function attachDiagnostics() {
+  return latestDiagnostics;
+}
+async function askRewrite(page: Page, waitForProposal = true) {
+  await page
+    .getByLabel("Ask for a targeted change")
+    .fill(
+      'Replace only the first bullet sentence "Built a TypeScript dashboard used by 120 teammates to review service health." with "Built a service-health dashboard in TypeScript for 120 teammates." Use rewrite_bullet or an exact range_patch and preserve every other character.',
+    );
+  const requested = page.waitForRequest(
+    (request) =>
+      new URL(request.url()).pathname === "/api/agent" &&
+      request.method() === "POST",
+  );
+  await page.getByRole("button", { name: "Propose", exact: true }).click();
+  const body = z
+    .object({ instruction: z.string().min(1), call: z.never().optional() })
+    .parse((await requested).postDataJSON());
+  expect(body.instruction).toContain("Replace only");
+  if (waitForProposal)
+    await expect(page.locator(".proposal-card")).toContainText(
+      "service-health dashboard",
+      { timeout: 45_000 },
+    );
 }
 async function newResume(page: Page, name: string) {
   await page.getByRole("button", { name: "New resume", exact: true }).click();
@@ -45,12 +110,59 @@ async function newResume(page: Page, name: string) {
       name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
     })
     .click();
-  await expect(page.locator(".textLayer")).toContainText("Alex");
+  await expect(page.locator(".textLayer")).toContainText("Experience");
+  const pdfTab = page.getByRole("tab", { name: "PDF", exact: true });
+  if (await pdfTab.isVisible()) await pdfTab.click();
   await expect(page.getByLabel("PDF page 1", { exact: true })).toBeVisible();
-  return z.object({ resume: resumeSchema }).parse(await (await created).json())
-    .resume;
+  const sourceTab = page.getByRole("tab", { name: "LaTeX", exact: true });
+  if (await sourceTab.isVisible()) await sourceTab.click();
+  const blank = z
+    .object({ resume: resumeSchema })
+    .parse(await (await created).json()).resume;
+  expect(blank.source).not.toMatch(/Alex|TypeScript|Example Labs/);
+  const fixture = fixtures.find((template) => template.id === blank.template);
+  if (!fixture) throw new Error("Missing test fixture");
+  await page
+    .getByRole("textbox", { name: "LaTeX source" })
+    .fill(fixture.source);
+  await page.keyboard.press("Control+s");
+  await expect(page.locator(".textLayer")).toContainText("Alex");
+  return resumeSchema.parse(
+    (await (await page.request.get(`/api/workspace?id=${blank.id}`)).json())
+      .resume,
+  );
+}
+async function hardNavigation(page: Page, action: "open" | "reload") {
+  await page.waitForLoadState("networkidle");
+  const diagnostics = navigationDiagnostics.get(page);
+  if (diagnostics) diagnostics.leaving = new Set(diagnostics.inflight);
+  try {
+    if (action === "open") await page.goto("/", { waitUntil: "networkidle" });
+    else await page.reload({ waitUntil: "networkidle" });
+  } finally {
+    if (diagnostics) diagnostics.leaving = null;
+  }
+  await expect(
+    page.getByRole("button", { name: "New resume", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".loading-state")).toHaveCount(0);
+}
+async function openDashboard(page: Page) {
+  await hardNavigation(page, "open");
 }
 async function noOverflow(page: Page) {
+  for (const control of await page
+    .locator(
+      ".editor-header button:visible, .editor-header select:visible, .editor-header a:visible",
+    )
+    .all()) {
+    const box = await control.boundingBox();
+    if (!box) throw new Error("A visible header control has no bounds");
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(
+      (page.viewportSize()?.width ?? 0) + 1,
+    );
+  }
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth + 1,
@@ -60,10 +172,9 @@ async function noOverflow(page: Page) {
 test("source edit → save → actual PDF, review/accept/reject/undo, ATS, history, downloads and deletion", async ({
   page,
 }) => {
-  const errors = attachDiagnostics(page);
-  await page.goto("/");
+  const errors = attachDiagnostics();
   await expect(
-    page.getByRole("heading", { name: "Make room for your next chapter." }),
+    page.getByRole("heading", { name: "My resumes", exact: true }).first(),
   ).toBeVisible();
   await page.screenshot({
     path: "artifacts/dashboard-desktop.png",
@@ -108,7 +219,7 @@ test("source edit → save → actual PDF, review/accept/reject/undo, ATS, histo
     fullPage: true,
   });
   await page.getByLabel("Show assistant", { exact: true }).click();
-  await page.getByRole("button", { name: "Tighten a bullet" }).click();
+  await askRewrite(page);
   await expect(
     page.getByRole("button", { name: "Accept", exact: true }),
   ).toBeVisible();
@@ -178,7 +289,7 @@ test("source edit → save → actual PDF, review/accept/reject/undo, ATS, histo
   await page.getByLabel("Version history", { exact: true }).click();
   const first = page
     .locator(".history-list article")
-    .filter({ has: page.getByText("Revision 1", { exact: true }) });
+    .filter({ has: page.getByText("Revision 2", { exact: true }) });
   await first.getByRole("button", { name: "Restore", exact: true }).click();
   await expect(source).toContainText("Alex Morgan");
   await expect(page.locator(".textLayer")).toContainText("Alex Morgan");
@@ -210,7 +321,7 @@ test("source edit → save → actual PDF, review/accept/reject/undo, ATS, histo
     .getByRole("button", { name: "Delete resume", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Every next step starts with a draft." }),
+    page.getByRole("heading", { name: "Create your first resume" }),
   ).toBeVisible();
   await writeFile(
     "artifacts/workflow-diagnostics.json",
@@ -221,7 +332,7 @@ test("source edit → save → actual PDF, review/accept/reject/undo, ATS, histo
 test("all templates render and desktop/tablet/mobile controls, dark theme and screenshots remain usable", async ({
   page,
 }) => {
-  const errors = attachDiagnostics(page);
+  const errors = attachDiagnostics();
   await page.addInitScript(() => {
     const NativeObserver = window.ResizeObserver;
     const active = new Set<ResizeObserver>();
@@ -250,7 +361,7 @@ test("all templates render and desktop/tablet/mobile controls, dark theme and sc
       }
     };
   });
-  await page.goto("/");
+  await openDashboard(page);
   for (const name of ["Deedy", "AltaCV-style", "moderncv", "Jake's Resume"]) {
     await newResume(page, name);
     await expect(page.locator(".textLayer")).toContainText("TypeScript");
@@ -356,7 +467,7 @@ test("all templates render and desktop/tablet/mobile controls, dark theme and sc
     });
     await page.getByRole("tab", { name: "Assistant", exact: true }).click();
     await expect(
-      page.getByRole("heading", { name: "A second pair of eyes." }),
+      page.getByRole("heading", { name: "Assistant" }),
     ).toBeVisible();
     await page.screenshot({
       path: `artifacts/editor-${viewport.width}-assistant.png`,
@@ -372,9 +483,10 @@ test("all templates render and desktop/tablet/mobile controls, dark theme and sc
     });
   }
   await page
-    .getByRole("button", { name: "Use dark theme", exact: true })
-    .click();
-  await expect(page.locator("html")).toHaveClass(/dark/);
+    .getByLabel("Theme", { exact: true })
+    .filter({ visible: true })
+    .selectOption("dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.getByRole("tab", { name: "LaTeX", exact: true }).click();
   await page.getByRole("tab", { name: "PDF", exact: true }).click();
   for (let step = 0; step < 6; step++)
@@ -437,11 +549,12 @@ test("all templates render and desktop/tablet/mobile controls, dark theme and sc
     path: "artifacts/dashboard-mobile-dark.png",
     fullPage: true,
   });
-  await page.reload();
-  await expect(page.locator("html")).toHaveClass(/dark/);
+  await hardNavigation(page, "reload");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page
-    .getByRole("button", { name: "Use light theme", exact: true })
-    .click();
+    .getByLabel("Theme", { exact: true })
+    .filter({ visible: true })
+    .selectOption("light");
   await page.setViewportSize({ width: 768, height: 1024 });
   await noOverflow(page);
   await page.screenshot({
@@ -457,8 +570,8 @@ test("all templates render and desktop/tablet/mobile controls, dark theme and sc
 test("debounced compile, failed compile retention, targeted ATS fixes, evidence and engine freshness", async ({
   page,
 }) => {
-  const errors = attachDiagnostics(page);
-  await page.goto("/");
+  const errors = attachDiagnostics();
+  await openDashboard(page);
   const created = await newResume(page, "Jake's Resume");
   await page.getByLabel("Hide side panel").click();
   const source = page.getByRole("textbox", { name: "LaTeX source" });
@@ -498,8 +611,43 @@ test("debounced compile, failed compile retention, targeted ATS fixes, evidence 
   await expect(page.locator(".proposal-card")).toContainText(
     "recognizable Skills heading",
   );
-  await page.getByRole("button", { name: "Reject", exact: true }).click();
-  await page.getByLabel("Show ATS check", { exact: true }).click();
+  let releaseReject: () => void = () => {};
+  let rejectReady: () => void = () => {};
+  const rejectGate = new Promise<void>((resolve) => {
+    releaseReject = resolve;
+  });
+  const rejection = new Promise<void>((resolve) => {
+    rejectReady = resolve;
+  });
+  const heldReject = async (route: import("@playwright/test").Route) => {
+    const input = route.request().postDataJSON();
+    if (input?.op !== "decide" || input.accept !== false) {
+      await route.continue();
+      return;
+    }
+    const response = await route.fetch();
+    expect(response.status()).toBe(200);
+    rejectReady();
+    await rejectGate;
+    await route.fulfill({ response });
+  };
+  await page.route("**/api/workspace", heldReject);
+  try {
+    await page.getByRole("button", { name: "Reject", exact: true }).click();
+    await rejection;
+    await page.getByLabel("Show ATS check", { exact: true }).click();
+    await expect(
+      sections.getByRole("button", { name: "Fix with assistant" }),
+    ).toBeDisabled();
+    releaseReject();
+    await expect(
+      sections.getByRole("button", { name: "Fix with assistant" }),
+    ).toBeEnabled();
+  } finally {
+    releaseReject();
+    await page.unroute("**/api/workspace", heldReject);
+  }
+
   await sections.getByRole("button", { name: "Fix with assistant" }).click();
   await page.getByRole("button", { name: "Accept", exact: true }).click();
   await page.getByLabel("Show ATS check", { exact: true }).click();
@@ -543,15 +691,31 @@ test("debounced compile, failed compile retention, targeted ATS fixes, evidence 
 test("late assistant, acceptance and ATS responses cannot replace another open resume", async ({
   page,
 }) => {
-  const errors = attachDiagnostics(page);
-  const make = async (name: string, template: string) =>
-    z.object({ resume: resumeSchema }).parse(
+  const errors = attachDiagnostics();
+  const make = async (name: string, template: string) => {
+    const response = await page.request.post("/api/workspace", {
+      data: { op: "create", name, template },
+    });
+    const blank = z
+      .object({ resume: resumeSchema })
+      .parse(await response.json()).resume;
+    const fixture = fixtures.find((item) => item.id === template);
+    if (!fixture) throw new Error("Missing test fixture");
+    return z.object({ resume: resumeSchema }).parse(
       await (
         await page.request.post("/api/workspace", {
-          data: { op: "create", name, template },
+          data: {
+            op: "save",
+            id: blank.id,
+            baseDigest: blank.digest,
+            expectedRevision: blank.revision,
+            source: fixture.source,
+            engine: blank.engine,
+          },
         })
       ).json(),
     ).resume;
+  };
   const a = await make("Race A", "jake");
   const b = await make("Race B", "jake");
   const bSaved = z.object({ resume: resumeSchema }).parse(
@@ -569,7 +733,7 @@ test("late assistant, acceptance and ATS responses cannot replace another open r
     ).json(),
   ).resume;
   expect(bSaved.name).toBe("Race B");
-  await page.goto("/");
+  await openDashboard(page);
   const open = async (name: string) => {
     await page.getByRole("button", { name: new RegExp(`^${name} `) }).click();
     await expect(page.locator(".document-name")).toContainText(name);
@@ -625,7 +789,7 @@ test("late assistant, acceptance and ATS responses cannot replace another open r
   };
   await open(a.name);
   const proposal = await hold("**/api/agent");
-  await page.getByRole("button", { name: "Tighten a bullet" }).click();
+  await askRewrite(page, false);
   await proposal.ready;
   await home();
   await open(b.name);
@@ -671,11 +835,11 @@ test("late assistant, acceptance and ATS responses cannot replace another open r
 test("same-resume apply locks prevent lost typing and new resumes have independent undo history", async ({
   page,
 }) => {
-  const errors = attachDiagnostics(page);
-  await page.goto("/");
+  const errors = attachDiagnostics();
+  await openDashboard(page);
   const doc = await newResume(page, "Jake's Resume");
   const source = page.getByRole("textbox", { name: "LaTeX source" });
-  await page.getByRole("button", { name: "Tighten a bullet" }).click();
+  await askRewrite(page);
   await expect(
     page.getByRole("button", { name: "Accept", exact: true }),
   ).toBeVisible();
@@ -706,13 +870,26 @@ test("same-resume apply locks prevent lost typing and new resumes have independe
         await page.getByLabel("Version history", { exact: true }).click();
         await page
           .locator(".history-list article")
-          .filter({ has: page.getByText("Revision 1", { exact: true }) })
+          .filter({ has: page.getByText("Revision 2", { exact: true }) })
           .getByRole("button", { name: "Restore", exact: true })
           .click();
       }
       await ready;
       if (operation === "restore") await page.keyboard.press("Escape");
       await expect(source).toHaveAttribute("contenteditable", "false");
+      await expect(
+        page.getByRole("button", { name: "Put skills first", exact: true }),
+      ).toBeDisabled();
+      await expect(
+        page.getByRole("button", { name: "Tighten a bullet", exact: true }),
+      ).toBeDisabled();
+      await expect(
+        page.getByRole("button", { name: "Propose", exact: true }),
+      ).toBeDisabled();
+      if (operation === "decide")
+        await expect(
+          page.getByRole("button", { name: "Reject", exact: true }),
+        ).toBeDisabled();
       await expect(
         page.getByLabel("LaTeX engine", { exact: true }),
       ).toBeDisabled();
@@ -752,15 +929,18 @@ test("same-resume apply locks prevent lost typing and new resumes have independe
     .click();
   await page.getByRole("dialog").getByRole("button", { name: /Deedy/ }).click();
   await expect(page.locator(".document-name")).toContainText("Deedy");
-  await expect(source).toContainText("\\selectfont Alex");
+  await expect(source).toContainText("\\selectfont\\strut");
   await page.getByLabel("Undo source edit", { exact: true }).click();
-  await expect(source).toContainText("\\selectfont Alex");
+  await expect(source).toContainText("\\selectfont\\strut");
   await expect(source).not.toContainText("Private Previous Resume");
+  const deedy = fixtures.find((item) => item.id === "deedy");
+  if (!deedy) throw new Error("Missing test fixture");
+  await source.fill(deedy.source);
+  await page.keyboard.press("Control+s");
+  await expect(page.locator(".textLayer")).toContainText("Alex");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("tab", { name: "Assistant", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Tighten a bullet", exact: true })
-    .click();
+  await askRewrite(page);
   await expect(page.locator(".proposal-card")).toContainText(
     "service-health dashboard",
   );
@@ -787,4 +967,99 @@ test("same-resume apply locks prevent lost typing and new resumes have independe
   await noOverflow(page);
   await page.screenshot({ path: "artifacts/editor-390-ats-score.png" });
   expect(errors).toEqual([]);
+});
+
+test.describe("visual evidence", () => {
+  test("refreshed light and dark workspace evidence across desktop tablet and phone", async ({
+    page,
+  }) => {
+    const errors = attachDiagnostics();
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 768, height: 1024 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      for (const theme of ["light", "dark"]) {
+        await openDashboard(page);
+        await page
+          .getByLabel("Theme", { exact: true })
+          .filter({ visible: true })
+          .selectOption(theme);
+        await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+        await expect(page.locator(".loading-state")).toHaveCount(0);
+        await noOverflow(page);
+        const prefix = `artifacts/refresh-after/${viewport.width}-${theme}`;
+        await page.screenshot({
+          path: `${prefix}-dashboard.png`,
+          fullPage: true,
+        });
+        await page
+          .getByRole("button", { name: "View all templates", exact: true })
+          .click();
+        await noOverflow(page);
+        await page.screenshot({
+          path: `${prefix}-templates.png`,
+          fullPage: true,
+        });
+        await openDashboard(page);
+        await newResume(page, "Jake's Resume");
+        const opposite = theme === "dark" ? "light" : "dark";
+        await page
+          .getByLabel("Theme", { exact: true })
+          .filter({ visible: true })
+          .selectOption(opposite);
+        const oppositeClasses = await page
+          .locator(".cm-editor")
+          .getAttribute("class");
+        await page
+          .getByLabel("Theme", { exact: true })
+          .filter({ visible: true })
+          .selectOption(theme);
+        await expect(page.locator(".cm-editor")).not.toHaveAttribute(
+          "class",
+          oppositeClasses ?? "",
+        );
+        await noOverflow(page);
+        await page.screenshot({ path: `${prefix}-source.png` });
+        if (viewport.width <= 768)
+          await page.getByRole("tab", { name: "PDF", exact: true }).click();
+        await expect(
+          page.getByLabel("PDF page 1", { exact: true }),
+        ).toBeVisible();
+        await page.screenshot({ path: `${prefix}-pdf.png` });
+        if (viewport.width <= 768)
+          await page
+            .getByRole("tab", { name: "Assistant", exact: true })
+            .click();
+        await page
+          .getByRole("button", { name: "Put skills first", exact: true })
+          .click();
+        await expect(page.locator(".proposal-card")).toBeVisible();
+        await noOverflow(page);
+        await page.screenshot({ path: `${prefix}-assistant.png` });
+        await page.getByRole("button", { name: "Reject", exact: true }).click();
+        if (viewport.width <= 768)
+          await page
+            .getByRole("tab", { name: "ATS check", exact: true })
+            .click();
+        else await page.getByLabel("Show ATS check", { exact: true }).click();
+        await page
+          .getByLabel("Job description", { exact: false })
+          .fill("Required React and TypeScript. Nice to have: Kubernetes.");
+        await page
+          .getByRole("button", { name: "Analyze compiled PDF", exact: true })
+          .click();
+        await expect(
+          page.getByText("Resume readiness", { exact: true }),
+        ).toBeVisible();
+        await expect(page.locator(".keyword-tags .missing")).toContainText(
+          "kubernetes",
+        );
+        await noOverflow(page);
+        await page.screenshot({ path: `${prefix}-ats.png` });
+      }
+    }
+    expect(errors).toEqual([]);
+  });
 });

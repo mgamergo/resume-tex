@@ -98,26 +98,26 @@
   }
 }
 :root {
-  --syntax-command: #08745e;
-  --syntax-comment: #965621;
-  --syntax-number: #9b3b91;
-  --syntax-punctuation: #4a5770;
-  --syntax-string: #8a3d2c;
+  --syntax-command: #315fea;
+  --syntax-comment: #717171;
+  --syntax-number: #4162a8;
+  --syntax-punctuation: #606060;
+  --syntax-string: #365ba1;
 }
 :root[data-theme="dark"] {
-  --syntax-command: #7bd9bf;
-  --syntax-comment: #bdac8f;
-  --syntax-number: #d5a6f5;
-  --syntax-punctuation: #a8bafa;
-  --syntax-string: #f0b38b;
+  --syntax-command: #a6bbff;
+  --syntax-comment: #a3a3a3;
+  --syntax-number: #a6bbff;
+  --syntax-punctuation: #c4c4c4;
+  --syntax-string: #a6bbff;
 }
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"] {
-    --syntax-command: #7bd9bf;
-    --syntax-comment: #bdac8f;
-    --syntax-number: #d5a6f5;
-    --syntax-punctuation: #a8bafa;
-    --syntax-string: #f0b38b;
+    --syntax-command: #a6bbff;
+    --syntax-comment: #a3a3a3;
+    --syntax-number: #a6bbff;
+    --syntax-punctuation: #c4c4c4;
+    --syntax-string: #a6bbff;
   }
 }
 @theme inline {
@@ -2437,4 +2437,36 @@ svg {
 }
 .dashboard-title {
   margin-bottom: 36px;
+}
+
+@media (max-width: 560px) {
+  .empty-library {
+    min-height: 230px;
+  }
+  .dashboard-title {
+    align-items: center;
+  }
+}
+
+@media (max-width: 560px) {
+  .document-identity {
+    min-width: 0;
+    flex: 1;
+  }
+  .document-name {
+    max-width: 90px;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .editor-actions {
+    flex-shrink: 0;
+  }
+}
+@media (max-width: 360px) {
+  .compile-button span {
+    display: none;
+  }
 }

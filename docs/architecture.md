@@ -19,3 +19,9 @@ Design alternatives considered: (1) canonical resume JSON generating LaTeX, reje
 - ATS: PDF extraction plus geometry, parsed fields, matched/missing terms, weighted breakdown and explicit limitations.
 
 Single-app modules keep call chains short. Separate deployment services or queues can replace the local compiler supervisor without changing the edit or scoring domain.
+
+## Model-selected source edits
+
+The provider asks the model for exact source text and replacement text. The adapter locates a unique occurrence in the immutable source snapshot before the request. Empty, missing, ambiguous, and overlapping selections fail. JavaScript computes the UTF-16 offsets, so the model does not count characters.
+
+The public structured tools and MCP retain exact numeric ranges. Shared validation still enforces factual evidence, edit bounds, digest freshness, revision compare-and-set, and user approval. The adapter never searches a newer revision or uses approximate matching.

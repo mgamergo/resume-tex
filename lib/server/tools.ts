@@ -18,24 +18,13 @@ export const toolNames = [
   "tailor_to_job",
   "flatten_columns",
 ] as const;
-export const toolCallSchema = z.discriminatedUnion("tool", [
+export const documentActionSchema = z.discriminatedUnion("tool", [
   z.object({ tool: z.literal("read_document") }),
   z.object({ tool: z.literal("flatten_columns") }),
-  z.object({
-    tool: z.literal("range_patch"),
-    title: z.string().max(120),
-    edits: z.array(editSchema).min(1).max(30),
-  }),
   z.object({
     tool: z.literal("insert_section"),
     heading: z.string().min(1).max(60),
     content: z.string().min(1).max(8000),
-  }),
-  z.object({
-    tool: z.literal("rewrite_bullet"),
-    start: z.number().int().nonnegative(),
-    end: z.number().int().nonnegative(),
-    replacement: z.string().max(8000),
   }),
   z.object({
     tool: z.literal("reorder_sections"),
@@ -48,6 +37,20 @@ export const toolCallSchema = z.discriminatedUnion("tool", [
   z.object({
     tool: z.literal("tailor_to_job"),
     jobDescription: z.string().min(10).max(20_000),
+  }),
+]);
+export const toolCallSchema = z.discriminatedUnion("tool", [
+  ...documentActionSchema.options,
+  z.object({
+    tool: z.literal("range_patch"),
+    title: z.string().max(120),
+    edits: z.array(editSchema).min(1).max(30),
+  }),
+  z.object({
+    tool: z.literal("rewrite_bullet"),
+    start: z.number().int().nonnegative(),
+    end: z.number().int().nonnegative(),
+    replacement: z.string().max(8000),
   }),
 ]);
 export type ToolCall = z.infer<typeof toolCallSchema>;
