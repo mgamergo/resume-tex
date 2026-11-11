@@ -76,5 +76,65 @@ test("query timeouts are retryable reads while mutation timeouts explicitly pres
         );
     }
   }
+  expect(calls).toBe(3);
+});
+test("only idempotent queries recover once, never structured errors, HTTP errors, caller aborts or mutations", async () => {
+  let calls = 0;
+  expect(
+    await convexOperation("query", async () => {
+      if (++calls === 1) throw new ConvexDeadlineError(new Error());
+      return "recovered";
+    }),
+  ).toBe("recovered");
   expect(calls).toBe(2);
+  calls = 0;
+  expect(
+    await convexOperation("query", async () => {
+      if (++calls === 1)
+        throw Object.assign(new TypeError("fetch failed"), {
+          cause: { code: "ECONNRESET" },
+        });
+      return "recovered";
+    }),
+  ).toBe("recovered");
+  expect(calls).toBe(2);
+  for (const kind of ["query", "mutation"] as const) {
+    for (const error of [
+      new DOMException("caller cancelled", "AbortError"),
+      Object.assign(new Error("fetch failed"), { status: 429 }),
+      Object.assign(new Error("fetch failed"), { status: 503 }),
+    ]) {
+      calls = 0;
+      await expect(
+        convexOperation(kind, async () => {
+          calls++;
+          throw error;
+        }),
+      ).rejects.toBe(error);
+      expect(calls).toBe(1);
+    }
+  }
+  calls = 0;
+  await expect(
+    convexOperation("mutation", async () => {
+      calls++;
+      throw new ConvexDeadlineError(new Error());
+    }),
+  ).rejects.toMatchObject({ status: 503 });
+  expect(calls).toBe(1);
+});
+
+test("known native read failures exhaust at two calls and writes stop at one with unknown outcome", async () => {
+  for (const kind of ["query", "mutation"] as const) {
+    let calls = 0;
+    await expect(
+      convexOperation(kind, async () => {
+        calls++;
+        throw Object.assign(new TypeError("fetch failed"), {
+          cause: { code: "ECONNRESET" },
+        });
+      }),
+    ).rejects.toMatchObject({ status: 503 });
+    expect(calls).toBe(kind === "query" ? 2 : 1);
+  }
 });
