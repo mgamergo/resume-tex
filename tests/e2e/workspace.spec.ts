@@ -17,7 +17,9 @@ function attachDiagnostics(page: Page) {
       diagnostics.push(`console: ${message.text()}`);
   });
   page.on("pageerror", (error) =>
-    diagnostics.push(`pageerror: ${error.message}`),
+    diagnostics.push(
+      `pageerror: ${error.name}: ${error.message}\n${error.stack ?? ""}`,
+    ),
   );
   page.on("requestfailed", (request) =>
     diagnostics.push(
@@ -249,6 +251,40 @@ test("all templates render and desktop/tablet/mobile controls, dark theme and sc
       name: "Command menu (Ctrl+K)",
       exact: true,
     });
+    await commandMenu.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByLabel("Search commands")).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(commandMenu).toBeFocused();
+    const renameOpener = page.locator(".document-name");
+    await renameOpener.click();
+    await expect(page.getByLabel("Resume name")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(renameOpener).toBeFocused();
+    for (const tab of ["PDF", "Assistant", "ATS check"]) {
+      await page.getByRole("tab", { name: tab, exact: true }).click();
+      await commandMenu.click();
+      await page.getByLabel("Search commands").fill("Find in source");
+      await page
+        .getByRole("button", { name: "Find in source", exact: true })
+        .click();
+      await expect(
+        page.getByRole("tab", { name: "LaTeX", exact: true }),
+      ).toHaveAttribute("aria-selected", "true");
+      const search = page.locator('.cm-search input[name="search"]');
+      await expect(search).toBeVisible();
+      await expect(search).toBeFocused();
+      await search.fill("");
+      await search.pressSequentially("Alex");
+      await expect(page.locator(".cm-searchMatch").first()).toBeVisible();
+      await page.screenshot({
+        path: `artifacts/editor-${viewport.width}-find-${tab.replaceAll(" ", "-")}.png`,
+      });
+      await page.keyboard.press("Escape");
+      await expect(
+        page.getByRole("textbox", { name: "LaTeX source", exact: true }),
+      ).toBeFocused();
+    }
     await commandMenu.click();
     await page.getByLabel("Search commands").fill("Version history");
     await page

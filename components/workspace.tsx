@@ -147,7 +147,7 @@ export function Workspace({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [modal, setModal] = useState<Modal>(null);
+  const [modal, setModalState] = useState<Modal>(null);
   const [name, setName] = useState("");
   const [creating, setCreating] = useState("");
   const [history, setHistory] = useState<RevisionSummary[]>([]);
@@ -184,6 +184,17 @@ export function Workspace({
     expected: string;
   } | null>(null);
   const [dashboardTab, setDashboardTab] = useState("resumes");
+  const dialogOpener = useRef<HTMLElement | null>(null);
+  const findAfterClose = useRef(false);
+  const setModal = useCallback((next: Modal) => {
+    if (
+      next &&
+      !dialogOpener.current &&
+      document.activeElement instanceof HTMLElement
+    )
+      dialogOpener.current = document.activeElement;
+    setModalState(next);
+  }, []);
   const documentSession = useRef(0);
   const editor = useRef<EditorHandle>(null);
   const activeRef = useRef(active);
@@ -748,7 +759,8 @@ export function Workspace({
         if (!applyingRef.current) void save(true);
         break;
       case "Find in source":
-        editor.current?.find();
+        setMobileView("source");
+        findAfterClose.current = true;
         break;
       case "Version history":
         setModal("history");
@@ -783,7 +795,7 @@ export function Workspace({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [setModal]);
   useEffect(() => {
     if (!active) return;
     const id = active.id;
@@ -1873,6 +1885,15 @@ export function Workspace({
           }}
         >
           <DialogContent
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              const opener = dialogOpener.current;
+              dialogOpener.current = null;
+              if (findAfterClose.current) {
+                findAfterClose.current = false;
+                requestAnimationFrame(() => editor.current?.find());
+              } else if (opener?.isConnected) opener.focus();
+            }}
             className={
               modal === "gallery"
                 ? "gallery-dialog"

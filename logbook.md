@@ -1,5 +1,11 @@
 # Logbook
 
+## 2026-11-11 — UI review corrections and PDF cancellation
+
+- Accepted U1/U2 from UI Sol round 1: command Find now reveals source and focuses search after dialog closure; dialogs retain and restore their opener while Find gets its destination focus. Keyboard assertions cover PDF/Assistant/ATS origins, search matches, Escape and rename/command focus at 768px and 390px.
+- The initial match assertion used Playwright fill, while installed CodeMirror commits on keyup/change. Normal typed input fixed the test action and retained the highlight assertion. Its trace is preserved. A later strict diagnostic found an actual RenderingCancelledException from an observer redraw during PDF teardown. Added the missing redraw error boundary and a disposed-import guard; active rendering failures remain visible, teardown cancellations are handled. Diagnostics now include error name and stack. No exclusions were added.
+- Full scripts/verify-local.sh passed after these changes: format, types, lint, build, 34 Bun tests/208 assertions, three Convex emulator tests, five production Chromium cases. All seven diagnostic reports are empty. Existing phone, zoom, source-session and proposal flows exercise the PDF lifecycle. Code awaits UI Sol recheck; no push during this loop.
+
 ## 2026-11-11 — Functionality approved and phone workflows checked
 
 - Functionality Sol round 2 approved all six findings at 734f066, with no findings open. The approved commit was pushed to private dev and its remote SHA verified. Model: codex gpt-6.1-sol, high reasoning effort; usage was not exposed.

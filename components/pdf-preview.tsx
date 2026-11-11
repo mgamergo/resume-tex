@@ -24,6 +24,7 @@ export function PdfPreview({
     const render = async () => {
       try {
         const pdfjs = await import("pdfjs-dist");
+        if (disposed) return;
         pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
         const task = pdfjs.getDocument({ url: `/api/pdf/${artifact}` });
         clean = () => {
@@ -99,6 +100,13 @@ export function PdfPreview({
               });
               await text.render();
             }
+          } catch (reason) {
+            if (!disposed)
+              setError(
+                reason instanceof Error
+                  ? reason.message
+                  : "PDF rendering failed",
+              );
           } finally {
             rendering = false;
             if (pending) {
