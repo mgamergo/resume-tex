@@ -691,5 +691,35 @@ test("same-resume apply locks prevent lost typing and new resumes have independe
   await page.getByLabel("Undo source edit", { exact: true }).click();
   await expect(source).toContainText("\\selectfont Alex");
   await expect(source).not.toContainText("Private Previous Resume");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("tab", { name: "Assistant", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Tighten a bullet", exact: true })
+    .click();
+  await expect(page.locator(".proposal-card")).toContainText(
+    "service-health dashboard",
+  );
+  await noOverflow(page);
+  await page.screenshot({ path: "artifacts/editor-390-proposal.png" });
+  await page.getByRole("button", { name: "Accept", exact: true }).click();
+  await page.getByRole("tab", { name: "PDF", exact: true }).click();
+  await expect(page.locator(".textLayer")).toContainText(
+    "service-health dashboard",
+  );
+  await page.getByRole("tab", { name: "ATS check", exact: true }).click();
+  await page
+    .getByLabel("Job description", { exact: false })
+    .fill("Required React.\nNice to have: Docker and Kubernetes.");
+  await page
+    .getByRole("button", { name: "Analyze compiled PDF", exact: true })
+    .click();
+  await expect(
+    page.getByText("Resume readiness", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".keyword-tags .missing")).toContainText(
+    "kubernetes",
+  );
+  await noOverflow(page);
+  await page.screenshot({ path: "artifacts/editor-390-ats-score.png" });
   expect(errors).toEqual([]);
 });

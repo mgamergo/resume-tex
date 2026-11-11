@@ -1,5 +1,10 @@
 # Logbook
 
+## 2026-11-11 — Functionality approved and phone workflows checked
+
+- Functionality Sol round 2 approved all six findings at 734f066, with no findings open. The approved commit was pushed to private dev and its remote SHA verified. Model: codex gpt-6.1-sol, high reasoning effort; usage was not exposed.
+- Added browser-only evidence at 390px for reviewing and accepting an actual proposal, reading its updated PDF, and scoring a real PDF against a job description with a missing skill. The targeted five-workflow case passed; typecheck and lint passed. Application behavior is unchanged. Separate UI/UX Sol review follows on the current tested source.
+
 ## 2026-11-11 — Functionality Sol corrections
 
 - Sol round 1 found six concrete issues. Created generated public assets on fresh checkout; locked source/engine/undo during accept and restore before awaiting; keyed editor history by resume; normalized terminal keyword punctuation; used token boundaries for skill claims and evidence; preserved exact-range conflict semantics across Convex. All findings accepted and corrected with focused regression coverage.
