@@ -34,7 +34,7 @@ export function getStore(token: string): Store {
   const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
   client.setAuth(token);
   const query = <T>(op: string, args: Record<string, unknown> = {}) =>
-    convexOperation(() =>
+    convexOperation("query", () =>
       client.query(
         makeFunctionReference<"query", { op: string; payload: string }, T>(
           "workspace:read",
@@ -43,7 +43,7 @@ export function getStore(token: string): Store {
       ),
     );
   const mutate = <T>(op: string, args: Record<string, unknown> = {}) =>
-    convexOperation(() =>
+    convexOperation("mutation", () =>
       client.mutation(
         makeFunctionReference<"mutation", { op: string; payload: string }, T>(
           "workspace:write",

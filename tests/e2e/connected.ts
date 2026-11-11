@@ -1,3 +1,5 @@
+import { sanitize } from "./diagnostics";
+export { sanitize } from "./diagnostics";
 import { createClerkClient } from "@clerk/backend";
 import { clerk, setupClerkTestingToken } from "@clerk/testing/playwright";
 import { expect, type Page } from "@playwright/test";
@@ -38,18 +40,6 @@ function users(page: Page) {
     pageUsers.set(page, owned);
   }
   return owned;
-}
-export function sanitize(value: string) {
-  return value
-    .replace(/https?:\/\/[^\s)]+/g, (url) => {
-      try {
-        const parsed = new URL(url);
-        return parsed.origin + parsed.pathname;
-      } catch {
-        return "[url]";
-      }
-    })
-    .replace(/eyJ[a-zA-Z0-9_.-]+/g, "[redacted]");
 }
 export async function signIn(page: Page) {
   await setupClerkTestingToken({ page });

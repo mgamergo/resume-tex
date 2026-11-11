@@ -22,7 +22,9 @@ export async function scope(request: Request) {
   const token = await session
     .getToken({ template: "convex" })
     .catch((error: unknown) => {
-      reportUpstreamError("clerk", error, startedAt);
+      reportUpstreamError("clerk", error, startedAt, {
+        requestAborted: request.signal.aborted,
+      });
       throw error;
     });
   if (!token)

@@ -1,3 +1,4 @@
+import { isNavigationCancellation } from "./diagnostics";
 import {
   test,
   expect,
@@ -17,9 +18,17 @@ type NavigationDiagnostics = {
   cancellations: string[];
 };
 const navigationDiagnostics = new WeakMap<Page, NavigationDiagnostics>();
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
   const errors: string[] = [];
   latestDiagnostics = errors;
+  if (!testInfo.project.use.baseURL || !process.env.CLERK_FAPI)
+    throw new Error("Browser origins are not configured");
+  const appOrigin = new URL(testInfo.project.use.baseURL).origin;
+  const clerkHost = new URL(
+    process.env.CLERK_FAPI.includes("://")
+      ? process.env.CLERK_FAPI
+      : "https://" + process.env.CLERK_FAPI,
+  ).hostname;
   page.on("console", (message) => {
     if (message.type() === "error")
       errors.push(sanitize(`console: ${message.text()}`));
@@ -39,10 +48,14 @@ test.beforeEach(async ({ page }) => {
     const failure = request.failure()?.errorText;
     const message = sanitize(`requestfailed: ${request.url()} ${failure}`);
     if (
-      navigation.leaving?.has(request) &&
-      request.method() === "GET" &&
-      new URL(request.url()).pathname === "/api/workspace" &&
-      failure === "net::ERR_ABORTED"
+      isNavigationCancellation({
+        recordedBeforeNavigation: navigation.leaving?.has(request) ?? false,
+        method: request.method(),
+        url: request.url(),
+        failure,
+        appOrigin,
+        clerkHost,
+      })
     )
       navigation.cancellations.push(message);
     else errors.push(message);

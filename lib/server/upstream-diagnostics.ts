@@ -2,6 +2,10 @@ export function reportUpstreamError(
   service: "clerk" | "convex" | "model",
   error: unknown,
   startedAt: number,
+  context: {
+    requestAborted?: boolean;
+    operationKind?: "query" | "mutation";
+  } = {},
 ) {
   const codes: string[] = [];
   const addCode = (value: unknown) => {
@@ -37,7 +41,9 @@ export function reportUpstreamError(
   }
   console.error(
     JSON.stringify({
-      event: "upstream_error",
+      event: context.requestAborted ? "request_cancelled" : "upstream_error",
+      requestAborted: context.requestAborted ?? null,
+      operationKind: context.operationKind ?? null,
       service,
       elapsedMs: Date.now() - startedAt,
       name:

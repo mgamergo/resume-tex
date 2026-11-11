@@ -23,6 +23,7 @@ export function mapConvexError(error: unknown): DomainError | undefined {
     return new DomainError(parsed.data.message, parsed.data.status);
 }
 export async function convexOperation<T>(
+  operationKind: "query" | "mutation",
   operation: () => Promise<T>,
 ): Promise<T> {
   const startedAt = Date.now();
@@ -31,7 +32,7 @@ export async function convexOperation<T>(
   } catch (error) {
     const mapped = mapConvexError(error);
     if (mapped) throw mapped;
-    reportUpstreamError("convex", error, startedAt);
+    reportUpstreamError("convex", error, startedAt, { operationKind });
     throw error;
   }
 }
