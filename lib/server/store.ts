@@ -32,13 +32,20 @@ export interface Store {
 export function getStore(token: string): Store {
   if (!process.env.NEXT_PUBLIC_CONVEX_URL)
     throw new Error("Configure NEXT_PUBLIC_CONVEX_URL through Infisical");
-  const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL, {
-    fetch: createConvexFetch(),
+  const queryClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL, {
+    fetch: createConvexFetch({ deadlineMs: 8_000 }),
   });
-  client.setAuth(token);
+  const mutationClient = new ConvexHttpClient(
+    process.env.NEXT_PUBLIC_CONVEX_URL,
+    {
+      fetch: createConvexFetch(),
+    },
+  );
+  queryClient.setAuth(token);
+  mutationClient.setAuth(token);
   const query = <T>(op: string, args: Record<string, unknown> = {}) =>
     convexOperation("query", () =>
-      client.query(
+      queryClient.query(
         makeFunctionReference<"query", { op: string; payload: string }, T>(
           "workspace:read",
         ),
@@ -47,7 +54,7 @@ export function getStore(token: string): Store {
     );
   const mutate = <T>(op: string, args: Record<string, unknown> = {}) =>
     convexOperation("mutation", () =>
-      client.mutation(
+      mutationClient.mutation(
         makeFunctionReference<"mutation", { op: string; payload: string }, T>(
           "workspace:write",
         ),

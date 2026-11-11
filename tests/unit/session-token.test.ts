@@ -1,8 +1,6 @@
+import { isKnownTransportFailure } from "../../lib/server/transport-error";
 import { expect, test } from "bun:test";
-import {
-  acquireSessionToken,
-  isTokenTransportFailure,
-} from "../../lib/server/session-token";
+import { acquireSessionToken } from "../../lib/server/session-token";
 const transport = () =>
   Object.assign(new Error(), {
     errors: [{ code: "unexpected_error", message: "fetch failed" }],
@@ -72,7 +70,7 @@ test("auth, configuration, unknown failures and caller cancellation are never re
     clearTimeout(abortTimer);
   }
   expect(
-    isTokenTransportFailure(
+    isKnownTransportFailure(
       Object.assign(new Error("fetch failed"), { cause: { status: 403 } }),
     ),
   ).toBe(false);

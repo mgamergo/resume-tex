@@ -1,3 +1,9 @@
+# 2026-11-11 — Recover bounded reads without replaying writes
+
+- The next live gate passed 10 of 11 browser cases; only initial authenticated list loading hit a real Convex query deadline. All four templates, the apply-lock flow, async races and the 36-frame evidence matrix passed. No Clerk recovery was needed. This remains a failed complete gate.
+- Separate fresh Node processes each completed 20 anonymous real queries with the expected structured authentication denial: standard connections 177–328 ms; Connection:close 202–517 ms. No pooling change was justified.
+- Read and write clients now have immutable separate transport deadlines: reads 8 seconds with at most one retry after 100 ms on an own deadline or confirmed native transport failure; writes 20 seconds and one attempt. Structured/business/HTTP errors and caller aborts never retry. Exhaustion remains visible as 503; writes explicitly preserve unknown outcome. Safe first-failure and recovery/exhaustion events remain logged. Focused regressions and typecheck pass; complete verification is pending.
+
 # 2026-11-11 — Recover token transport once
 
 - Node candidate 31f2e32 passed all core checks and 10 of 11 live browser cases (4.4 minutes), including the prior Convex failure and the complete screenshot matrix. One ordinary workspace read failed before storage at Clerk token acquisition (20 ms, absent HTTP status, SDK unexpected_error, caller not aborted); this is retained as a failed gate.

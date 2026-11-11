@@ -1,3 +1,5 @@
+import { setTimeout as delay } from "node:timers/promises";
+import { isKnownTransportFailure } from "./transport-error";
 import { ConvexDeadlineError } from "./convex-fetch";
 import { reportUpstreamError } from "./upstream-diagnostics";
 import { ConvexError } from "convex/values";
@@ -28,19 +30,55 @@ export async function convexOperation<T>(
   operation: () => Promise<T>,
 ): Promise<T> {
   const startedAt = Date.now();
-  try {
-    return await operation();
-  } catch (error) {
-    const mapped = mapConvexError(error);
-    if (mapped) throw mapped;
-    reportUpstreamError("convex", error, startedAt, { operationKind });
-    if (error instanceof ConvexDeadlineError)
-      throw new DomainError(
-        operationKind === "query"
-          ? "Storage read timed out. Try again shortly."
-          : "The change may have been saved. Download any unsaved source before refreshing to check the latest state.",
-        503,
-      );
-    throw error;
+  for (const attempt of [1, 2] as const) {
+    try {
+      const value = await operation();
+      if (attempt === 2)
+        console.error(
+          JSON.stringify({
+            event: "upstream_recovered",
+            service: "convex",
+            operationKind,
+            attempts: 2,
+            elapsedMs: Date.now() - startedAt,
+          }),
+        );
+      return value;
+    } catch (error) {
+      const mapped = mapConvexError(error);
+      if (mapped) throw mapped;
+      const transportFailure =
+        error instanceof ConvexDeadlineError || isKnownTransportFailure(error);
+      const retry =
+        operationKind === "query" && transportFailure && attempt === 1;
+      reportUpstreamError("convex", error, startedAt, {
+        operationKind,
+        attempt,
+        transportFailure,
+        outcome: retry
+          ? "retrying"
+          : operationKind === "query" && transportFailure
+            ? "exhausted"
+            : "not_retried",
+      });
+      if (retry) {
+        await delay(100);
+        continue;
+      }
+      if (transportFailure)
+        throw new DomainError(
+          operationKind === "query"
+            ? error instanceof ConvexDeadlineError
+              ? "Storage read timed out. Try again shortly."
+              : "Storage read is temporarily unavailable. Try again shortly."
+            : "The change may have been saved. Download any unsaved source before refreshing to check the latest state.",
+          503,
+        );
+      throw error;
+    }
   }
+  throw new DomainError(
+    "Storage is temporarily unavailable. Try again shortly.",
+    503,
+  );
 }

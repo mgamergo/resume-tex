@@ -30,8 +30,9 @@ export function createConvexFetch({
         headers: response.headers,
       });
     } catch (error) {
-      if (deadline.signal.aborted && !callers.some((caller) => caller.aborted))
-        throw new ConvexDeadlineError(error);
+      if (callers.some((caller) => caller.aborted))
+        throw new DOMException("Storage request cancelled", "AbortError");
+      if (deadline.signal.aborted) throw new ConvexDeadlineError(error);
       throw error;
     } finally {
       clearTimeout(timer);
