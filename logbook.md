@@ -1,5 +1,9 @@
 # Logbook
 
+## 2026-11-11 — Dialog key trace
+
+The first Escape fallback was insufficient. A focused browser trace showed Escape reaching the search input, becoming default-prevented and leaving the dialog open. The application dialog now handles Escape explicitly even when the underlying layer marks it prevented. Existing close/focus assertions remain; a focused repeated check must pass before another complete browser run. Temporary diagnostic test code was removed, while its ignored key trace and failed logs remain.
+
 ## 2026-11-11 — Immediate dialog Escape
 
 The full review recheck exposed a real early-Escape race after command input autofocus, plus a separate upstream Convex write deadline. Added a narrow dialog-content keyboard fallback that respects already-handled events and retains the existing focus-return path. Repeated keyboard open/Escape/focus assertions now cover 360px in both themes. No writes are replayed after transport failure. The failed gate remains archived; a fresh complete gate follows.
