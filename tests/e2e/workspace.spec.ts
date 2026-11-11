@@ -9,7 +9,7 @@ import { z } from "zod";
 import { resumeSchema } from "../../lib/core/schemas";
 import { signIn, cleanup, sanitize } from "./connected";
 import { templates as fixtures } from "../fixtures/templates";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 test.use({ video: "on" });
 let latestDiagnostics: string[] = [];
 type NavigationDiagnostics = {
@@ -185,6 +185,63 @@ async function noOverflow(page: Page) {
     ),
   ).toBe(true);
 }
+test("360px compile remains named and keyboard-operable in both themes", async ({
+  page,
+}) => {
+  const errors = attachDiagnostics();
+  await mkdir("artifacts/refresh-review", { recursive: true });
+  await page.setViewportSize({ width: 360, height: 844 });
+  await newResume(page, "Jake's Resume");
+  const compile = page.locator(".compile-button");
+  for (const theme of ["light", "dark"]) {
+    await page.getByLabel("Theme", { exact: true }).selectOption(theme);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await expect(compile.locator("span")).toBeHidden();
+    await expect(compile).toHaveAccessibleName("Compile");
+    await expect(compile).toBeEnabled();
+    await noOverflow(page);
+    const requested = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/compile" &&
+        response.request().method() === "POST",
+    );
+    await compile.focus();
+    await page.keyboard.press("Enter");
+    const result = await requested;
+    expect(result.status()).toBe(200);
+    expect(z.object({ ok: z.boolean() }).parse(await result.json()).ok).toBe(
+      true,
+    );
+    await expect(compile).toHaveAccessibleName("Compile");
+    await expect(compile).toBeEnabled();
+    await page.getByRole("tab", { name: "PDF", exact: true }).click();
+    await expect(page.getByLabel("PDF page 1", { exact: true })).toBeVisible();
+    await expect(page.locator(".textLayer")).toContainText("Alex");
+    await page.getByRole("tab", { name: "LaTeX", exact: true }).click();
+    await page.screenshot({
+      path: "artifacts/refresh-review/360-" + theme + "-source.png",
+    });
+  }
+  await page.getByLabel("Back to resumes", { exact: true }).click();
+  await expect(page.locator(".library-heading h2")).toContainText("Resumes");
+  for (const width of [1440, 768, 390]) {
+    await page.setViewportSize({
+      width,
+      height: width === 1440 ? 900 : width === 768 ? 1024 : 844,
+    });
+    for (const theme of ["light", "dark"]) {
+      await page
+        .locator('select[aria-label="Theme"]:visible')
+        .selectOption(theme);
+      await page.screenshot({
+        path:
+          "artifacts/refresh-review/" + width + "-" + theme + "-dashboard.png",
+      });
+    }
+  }
+  expect(errors).toEqual([]);
+});
+
 test("source edit → save → actual PDF, review/accept/reject/undo, ATS, history, downloads and deletion", async ({
   page,
 }) => {
