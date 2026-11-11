@@ -39,7 +39,7 @@ The unit suite compiles all four templates in the actual sandbox, extracts their
 
 This Linux namespace/runtime policy has been exercised on the authorized boxes.dev development box. It does not establish macOS/Windows or arbitrary shared-host namespace support. Use a separately reviewed container/VM worker before adapting to unsupported hosts. No application service is published by setup.
 
-SyncTeX is disabled in v1. The viewer's double-click source action searches exact visible text and is labeled approximate; macro expansion, fonts and ligatures can prevent a match.
+Full bidirectional SyncTeX is deferred in v1. The current artifact pipeline retains PDFs and logs, without a sandboxed SyncTeX-record query endpoint or tested PDF-coordinate hit mapping. Enabling the compiler flag alone would not produce reliable browser navigation. The viewer instead provides labeled, approximate double-click-to-source lookup using exact visible text; macro expansion, fonts and ligatures can prevent a match. Source-to-PDF navigation is unavailable.
 
 ## PDF analysis worker
 

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { z } from "zod";
 import { resumeSchema } from "../../lib/core/schemas";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 let latestDiagnostics: string[] = [];
 test.afterEach(async ({}, testInfo) => {
   await writeFile(
@@ -245,6 +245,37 @@ test("all templates render and desktop/tablet/mobile controls, dark theme and sc
     { width: 390, height: 844 },
   ]) {
     await page.setViewportSize(viewport);
+    const commandMenu = page.getByRole("button", {
+      name: "Command menu (Ctrl+K)",
+      exact: true,
+    });
+    await commandMenu.click();
+    await page.getByLabel("Search commands").fill("Version history");
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Version history", exact: true })
+      .click();
+    await expect(
+      page
+        .getByRole("dialog")
+        .getByRole("heading", { name: "Version history", exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Close", exact: true })
+      .click();
+    await commandMenu.click();
+    await page.getByLabel("Search commands").fill("Download LaTeX");
+    const mobileDownload = page.waitForEvent("download");
+    await page
+      .getByRole("button", { name: "Download LaTeX source", exact: true })
+      .click();
+    const downloadedSource = await (await mobileDownload).path();
+    if (!downloadedSource)
+      throw new Error("Source download did not produce a file");
+    expect(await readFile(downloadedSource, "utf8")).toContain(
+      "\\documentclass",
+    );
     await page.getByRole("tab", { name: "LaTeX", exact: true }).click();
     await expect(
       page.getByRole("textbox", { name: "LaTeX source" }),

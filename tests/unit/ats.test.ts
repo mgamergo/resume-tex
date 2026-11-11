@@ -112,3 +112,25 @@ test("employment dates do not become phone contacts and two degrees retain separ
   expect(parsed.education[1].institution).toBe("Example Institute");
   expect(parsed.education[1].dates).toBe("2018 - 2020");
 });
+
+test.each(["Nice to have", "Nice-to-have", "Nice‑to‑haves:"])(
+  "preferred heading %s ends required-skill context",
+  (heading) => {
+    const keywords = keywordsFor(
+      "React Docker",
+      `Requirements\nReact\n${heading}\nDocker`,
+    );
+    expect(keywords.find((keyword) => keyword.term === "react")?.required).toBe(
+      true,
+    );
+    expect(
+      keywords.find((keyword) => keyword.term === "docker")?.required,
+    ).toBe(false);
+    expect(keywords.map((keyword) => keyword.term)).not.toContain(
+      "nice-to-have",
+    );
+    expect(keywords.map((keyword) => keyword.term)).not.toContain(
+      "nice-to-haves",
+    );
+  },
+);

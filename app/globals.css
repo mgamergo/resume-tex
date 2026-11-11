@@ -1744,9 +1744,6 @@ svg {
     min-height: 55px;
     padding-inline: 5px;
   }
-  .editor-actions > [data-slot="tooltip-trigger"]:first-child {
-    display: none;
-  }
   .document-name {
     max-width: 215px;
   }
@@ -2179,6 +2176,7 @@ svg {
   .editor-actions > [data-slot="tooltip-trigger"] {
     display: none;
   }
+  .editor-actions > [data-slot="tooltip-trigger"]:first-child,
   .editor-actions > [data-slot="tooltip-trigger"]:nth-child(3) {
     display: flex;
     width: 27px;

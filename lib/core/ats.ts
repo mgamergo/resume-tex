@@ -132,18 +132,23 @@ export function keywordsFor(text: string, jd: string): Keyword[] {
     .split(/\n|(?<=[.!?])\s+(?=[A-Z])/)
     .map((line) => {
       const lower = normalize(line.trim());
+      const heading = lower.replace(/[-\s]+/g, " ");
       if (
-        /^(?:requirements|qualifications|must have|required|minimum qualifications|essential skills)\s*:?$/.test(
-          lower,
+        /^(?:requirements|qualifications|must haves?|required|minimum qualifications|essential skills)\s*:?$/.test(
+          heading,
         )
-      )
+      ) {
         requirementContext = true;
+        return "";
+      }
       if (
-        /^(?:nice to have|preferred|preferred qualifications|bonus|optional)\s*:?$/.test(
-          lower,
+        /^(?:nice to haves?|preferred|preferred qualifications|bonus|optional)\s*:?$/.test(
+          heading,
         )
-      )
+      ) {
         requirementContext = false;
+        return "";
+      }
       return (requirementContext ? "required " : "") + lower;
     })
     .filter((line) => line.trim());

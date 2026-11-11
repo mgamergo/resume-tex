@@ -1,5 +1,14 @@
 # Logbook
 
+## 2026-11-11 — Independent verification and final corrections
+
+- Parent accepted exclusive ownership at pushed fc1dfea. An independent full driver passed format, lint, types, build, 31 Bun tests/185 assertions, two Convex emulator tests and all four production Chromium cases; mobile history and source-download controls were exercised at 768/390 widths. Diagnostics remained empty.
+- Two concrete regressions were reproduced before correction: hyphenated preferred headings were marked required, and narrow layouts hid the only entry to history/source export. Normalized heading separators/plurals and restored the command button on narrow screens, with unit/browser regression coverage.
+- The preferred-heading regression also exposed heading words entering the missing-keyword list. Recognized delimiters now only change requirement context and do not become scored terms. All eight ATS unit cases pass with 40 assertions after the fix.
+- SyncTeX's concrete missing pipeline/query/hit-testing pieces and unavailable source-to-PDF direction are now documented. Approximate PDF text-to-source remains available.
+- Read-only comment audit covered 61 source files, found no suppressions or actionable comments, and retained actual bundler directives. No comment edits or holds.
+- Next: full verification on this committed correction, then functionality and UI/UX sol-loop passes. Live Clerk/Convex issuance and real LLM credentials remain human setup in the dedicated Infisical project.
+
 ## 2026-11-11 — Complete v1 workspace and verification
 
 - Added the document dashboard/gallery, shadcn controls, LaTeX CodeMirror editor with macro completion/undo/find/diagnostics, resizable PDF split with actual canvas/selectable text, command menu, persisted theme, responsive tabs, source/PDF downloads, rename/delete and version restore. Four distinct template adaptations compile through the isolated runtime.
