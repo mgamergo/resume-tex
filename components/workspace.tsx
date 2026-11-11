@@ -1748,7 +1748,7 @@ export function Workspace() {
         >
           <DialogContent
             onKeyDown={(event) => {
-              if (event.key === "Escape" && !event.defaultPrevented) {
+              if (event.key === "Escape") {
                 event.preventDefault();
                 setModal(null);
               }

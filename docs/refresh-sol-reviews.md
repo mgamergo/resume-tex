@@ -17,7 +17,7 @@ The new 360px regression was run against the previous production build before re
 
 Initial diff: 55 files, 2,501 insertions and 799 deletions.
 
-The first full recheck passed the new 360px test but failed an existing immediate-Escape/focus-return assertion: the search field had focus while Radix had not yet installed its passive highest-layer keyboard listener. A content-level Escape handler now closes the active dialog when the event was not already handled. The 360px test repeats immediate open/Escape/focus-return three times in each theme; existing tablet/phone assertions remain unchanged. A separate real Convex mutation timed out and correctly was not replayed. This failed run is archived and is not counted as a pass.
+The first full recheck passed the new 360px test but failed an existing immediate-Escape/focus-return assertion. A focused real-browser key trace then proved that Escape reached the focused search field and became default-prevented while the dialog remained open. The first content fallback skipped prevented events and did not resolve the failure. The current handler closes this application dialog explicitly on Escape; it retains the existing focus-return path. The 360px test repeats immediate open/Escape/focus-return three times in each theme, and existing tablet/phone assertions remain unchanged. A separate real Convex mutation timed out and correctly was not replayed. Failed and interrupted runs remain archived and are not counted as passes. Temporary diagnostic test code was removed.
 
 ## Round 2
 
