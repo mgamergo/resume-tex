@@ -867,6 +867,7 @@ export function Workspace() {
                   </IconButton>
                   {themeButton}
                   <Button
+                    aria-label={busy ? "Compiling…" : "Compile"}
                     className="compile-button"
                     onClick={() => void save(true)}
                     disabled={applying || busy || saveState === "saving"}
@@ -1632,7 +1633,7 @@ export function Workspace() {
                     {resumes.length > 0 && (
                       <div className="library-heading">
                         <h2>
-                          Recent <span>{resumes.length}</span>
+                          Resumes <span>{resumes.length}</span>
                         </h2>
                         <span>Last edited</span>
                       </div>

@@ -1,6 +1,6 @@
 # Real-service refresh verification
 
-The refresh uses real Clerk sessions, the deployed private Convex workspace, the configured compatible model, and the isolated TeX compiler. Runtime local stores, model mocks, browser draft recovery, fictional starter content and product mode switches are removed. Historical local documents and browser keys remain untouched and are not migrated.
+The refresh uses real Clerk sessions, the deployed private Convex workspace, the configured compatible model, and the isolated TeX compiler. Runtime local stores, model mocks, browser draft recovery, fictional starter content and product mode switches are removed. Historical local documents and browser keys are preserved and are not migrated.
 
 ## Candidate and commands
 
