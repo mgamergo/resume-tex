@@ -58,3 +58,5 @@ INSTABOX_HEADLESS=1 bun run test:e2e
 Playwright starts a loopback production server, uses one Chromium worker, attaches console/page/request/HTTP-error diagnostics before navigation, tests real flows, writes screenshots to ignored `artifacts/`, and stops its server and contexts. It clears only `.data/e2e`, its dedicated test database. Unit tests compile all four templates with the actual isolated toolchain and parse their PDF output. Convex tests exercise authenticated emulator behavior, not live Clerk issuance or a deployed Convex instance. Live connected sign-in and a configured LLM need human keys and remain separate setup verification.
 
 See [compilation policy](docs/compilation.md) for isolation and resource limits. No app hosting, production service changes, or deployment are included.
+
+Final v1 outcomes and limits: [verification](docs/verification.md), [Sol review ledger](docs/sol-reviews.md), and [logbook](logbook.md).

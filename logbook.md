@@ -1,5 +1,12 @@
 # Logbook
 
+## 2026-11-11 — V1 reviews approved and handoff
+
+- Functionality sol-loop approved in two rounds; UI/UX sol-loop approved in three at 2c2c395. All F1–F6 and U1–U3 are resolved, with no declined or disputed findings. Reviewer provider/model/effort: codex/gpt-6.1-sol/high; usage was not exposed. docs/sol-reviews.md records findings, outcomes and diff sizes.
+- Latest complete verification passed formatting, types, lint, production build, 34 Bun tests/208 assertions, three Convex emulator tests and five Chromium cases (54.7 seconds), with seven empty diagnostic reports. Source/PDF, actual phone proposals/ATS, keyboard focus, lifecycle counts, ownership/CAS, MCP and sandbox/resource evidence are documented in docs/verification.md. Desktop, tablet and phone screenshots were inspected and posted inline.
+- This final commit adds documentation only. Code-diff hashes match the verified run. Private dev is the handoff branch; no main merge, app publishing or Dokploy changes. Preserve session box 0797a779-76a0-4296-b04b-5d61980d9a25 and default-box.
+- Human setup remains for Clerk, a Convex development deployment and real model settings in the dedicated Infisical resume-tex project. Live service credentials were not fabricated or fetched from unrelated projects. Full SyncTeX, arbitrary uploaded bundles, OCR and realtime character collaboration remain the explicit v1 limits.
+
 ## 2026-11-11 — Final PDF observer correction
 
 - UI Sol round 2 resolved U1/U2 and requested one remaining U3 guard after the awaited initial draw. Added the disposal check before observer construction so teardown cannot attach a late observer. Browser instrumentation keeps native observer behavior and asserts one PDF observer after repeated zoom, zero after leaving the editor.
