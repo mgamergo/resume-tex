@@ -10,7 +10,9 @@ export const resumeSchema = z.object({
   revision: z.number().int(),
   updatedAt: z.number(),
 });
+export const resumeSummarySchema = resumeSchema.omit({ source: true });
 export const revisionSchema = resumeSchema.extend({ note: z.string() });
+export const revisionSummarySchema = revisionSchema.omit({ source: true });
 export const proposalSchema = proposalInputSchema.extend({
   id: z.string(),
   resumeId: z.string(),
@@ -28,6 +30,8 @@ export const compileSchema = z.discriminatedUnion("ok", [
     ok: z.literal(true),
     artifact: z.string(),
     digest: z.string(),
+    engine: engineSchema,
+    revision: z.number(),
     log: z.string(),
     diagnostics: z.array(diagnosticSchema),
     cached: z.boolean(),
@@ -35,6 +39,8 @@ export const compileSchema = z.discriminatedUnion("ok", [
   z.object({
     ok: z.literal(false),
     digest: z.string(),
+    engine: engineSchema,
+    revision: z.number(),
     log: z.string(),
     diagnostics: z.array(diagnosticSchema),
     error: z.string(),
@@ -43,6 +49,8 @@ export const compileSchema = z.discriminatedUnion("ok", [
 export const atsSchema = z.object({
   digest: z.string(),
   artifact: z.string(),
+  engine: engineSchema,
+  revision: z.number(),
   score: z.number(),
   breakdown: z.array(
     z.object({

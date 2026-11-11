@@ -4,18 +4,19 @@ import { getStore } from "./store";
 const rates = new Map<string, { count: number; until: number }>();
 export async function scope(request: Request) {
   const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin)
+  const requestUrl = new URL(request.url);
+  const hostUrl = new URL(
+    `${requestUrl.protocol}//${request.headers.get("host") ?? requestUrl.host}`,
+  );
+  const expectedOrigin = process.env.APP_ORIGIN ?? hostUrl.origin;
+  if (origin && origin !== expectedOrigin)
     throw new DomainError("Cross-origin request denied", 403);
   if (Number(request.headers.get("content-length") ?? 0) > 512_000)
     throw new DomainError("Request exceeds 512 KB", 413);
   let owner: string;
   let token: string | undefined;
   if (process.env.APP_MODE === "local") {
-    if (
-      !["localhost", "127.0.0.1", "[::1]"].includes(
-        new URL(request.url).hostname,
-      )
-    )
+    if (!["localhost", "127.0.0.1", "[::1]"].includes(hostUrl.hostname))
       throw new DomainError("Local workspace only accepts loopback hosts", 403);
     owner = "local-workspace";
   } else {
@@ -33,7 +34,22 @@ export async function scope(request: Request) {
       throw new DomainError("Clerk Convex JWT template is missing", 503);
   }
   const now = Date.now();
-  const key = owner;
+  const path = requestUrl.pathname;
+  const bucket =
+    path === "/api/agent"
+      ? "agent"
+      : path === "/api/ats"
+        ? "ats"
+        : path === "/api/compile"
+          ? "compile"
+          : "workspace";
+  const limit =
+    bucket === "agent" || bucket === "ats"
+      ? 20
+      : bucket === "compile"
+        ? 60
+        : 300;
+  const key = `${owner}:${bucket}`;
   const previous = rates.get(key);
   const rate =
     previous && previous.until > now
@@ -43,7 +59,7 @@ export async function scope(request: Request) {
   rates.set(key, rate);
   if (rates.size > 10_000)
     for (const [id, value] of rates) if (value.until < now) rates.delete(id);
-  if (rate.count > 120)
+  if (rate.count > limit)
     throw new DomainError("Too many requests. Try again in a minute.", 429);
   return { owner, store: getStore(owner, token) };
 }

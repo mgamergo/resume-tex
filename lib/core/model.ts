@@ -32,6 +32,8 @@ export type Resume = {
   updatedAt: number;
 };
 export type Revision = Resume & { note: string };
+export type ResumeSummary = Omit<Resume, "source">;
+export type RevisionSummary = Omit<Revision, "source">;
 export type Proposal = ProposalInput & {
   id: string;
   resumeId: string;

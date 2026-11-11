@@ -1,3 +1,4 @@
+import { knownSkills } from "../core/ats";
 import { z } from "zod";
 import {
   DomainError,
@@ -15,9 +16,11 @@ export const toolNames = [
   "reorder_sections",
   "fix_compile_error",
   "tailor_to_job",
+  "flatten_columns",
 ] as const;
 export const toolCallSchema = z.discriminatedUnion("tool", [
   z.object({ tool: z.literal("read_document") }),
+  z.object({ tool: z.literal("flatten_columns") }),
   z.object({
     tool: z.literal("range_patch"),
     title: z.string().max(120),
@@ -49,6 +52,8 @@ export const toolCallSchema = z.discriminatedUnion("tool", [
 ]);
 export type ToolCall = z.infer<typeof toolCallSchema>;
 export const toolDescriptions: Record<ToolCall["tool"], string> = {
+  flatten_columns:
+    "Remove supported minipage column wrappers while preserving their contents.",
   read_document: "Read authoritative source, digest, revision and line ranges.",
   range_patch: "Propose bounded exact source edits. Never applies them.",
   insert_section: "Propose a section immediately before end document.",
@@ -61,9 +66,23 @@ export const toolDescriptions: Record<ToolCall["tool"], string> = {
   tailor_to_job:
     "Reorder existing bullet evidence by job-description relevance. No new claims.",
 };
-function ensureFacts(resume: Resume, proposal: ProposalInput) {
-  const sourceNumbers = new Set(resume.source.match(/\d+(?:\.\d+)?/g) ?? []);
+function ensureFacts(
+  resume: Resume,
+  proposal: ProposalInput,
+  verifiedEvidence = "",
+) {
+  const evidenceSource = resume.source + "\n" + verifiedEvidence;
+  const sourceNumbers = new Set(evidenceSource.match(/\d+(?:\.\d+)?/g) ?? []);
   for (const edit of proposal.edits) {
+    for (const skill of knownSkills)
+      if (
+        edit.replacement.toLowerCase().includes(skill) &&
+        !evidenceSource.toLowerCase().includes(skill)
+      )
+        throw new DomainError(
+          `This edit introduces an unsupported skill (${skill}). Add your verified evidence to the source first.`,
+          422,
+        );
     for (const number of edit.replacement.match(/\d+(?:\.\d+)?/g) ?? [])
       if (!sourceNumbers.has(number))
         throw new DomainError(
@@ -94,6 +113,7 @@ function latexEscape(value: string) {
 export function buildProposal(
   resume: Resume,
   call: Exclude<ToolCall, { tool: "read_document" }>,
+  verifiedEvidence = "",
 ): ProposalInput {
   const base = { baseDigest: resume.digest, evidenceNeeded: [] as string[] };
   if (call.tool === "range_patch") {
@@ -133,6 +153,35 @@ export function buildProposal(
   }
   let proposal: ProposalInput;
   switch (call.tool) {
+    case "flatten_columns": {
+      const starts = [
+        ...resume.source.matchAll(
+          /\\begin\{minipage\}(?:\[[^\]]{0,12}\])?\{0\.\d+\\textwidth\}/g,
+        ),
+      ];
+      const ends = [
+        ...resume.source.matchAll(/\\end\{minipage\}(?:\\hfill)?/g),
+      ];
+      if (starts.length !== 2 || ends.length !== 2)
+        throw new DomainError(
+          "Automatic column flattening supports the Deedy and AltaCV-style two-minipage layouts only.",
+          422,
+        );
+      proposal = {
+        ...base,
+        title: "Make the layout one column",
+        explanation:
+          "Removes only the two minipage wrappers and their spacer. All section text and achievements remain intact. Compile and inspect the new reading order before keeping it.",
+        edits: [...starts, ...ends].map((match) => ({
+          start: match.index,
+          end: match.index + match[0].length,
+          expected: match[0],
+          replacement: "\n\\par\n",
+        })),
+      };
+      break;
+    }
+
     case "range_patch":
       proposal = {
         ...base,
@@ -345,13 +394,18 @@ export function buildProposal(
       break;
     }
   }
-  return ensureFacts(resume, proposalInputSchema.parse(proposal));
+  return ensureFacts(
+    resume,
+    proposalInputSchema.parse(proposal),
+    verifiedEvidence,
+  );
 }
 export async function executeTool(
   store: Store,
   resumeId: string,
   call: ToolCall,
   baseDigest?: string,
+  verifiedEvidence = "",
 ) {
   const resume = await store.get(resumeId);
   if (
@@ -372,6 +426,9 @@ export async function executeTool(
     };
   return {
     kind: "proposal" as const,
-    proposal: await store.propose(resumeId, buildProposal(resume, call)),
+    proposal: await store.propose(
+      resumeId,
+      buildProposal(resume, call, verifiedEvidence),
+    ),
   };
 }

@@ -47,8 +47,10 @@ export type CompileResult =
     };
 let waiting = 0;
 let tail: Promise<void> = Promise.resolve();
-const root = () => resolve(process.env.TEX_TOOLS_DIR ?? ".tools");
-const cache = () => resolve(process.env.DATA_DIR ?? ".data", "pdf");
+const root = () =>
+  resolve(/*turbopackIgnore: true*/ process.env.TEX_TOOLS_DIR ?? ".tools");
+const cache = () =>
+  resolve(/*turbopackIgnore: true*/ process.env.DATA_DIR ?? ".data", "pdf");
 export function sandboxArgs(scratch: string, engine: Engine) {
   return [
     "--unshare-all",
@@ -254,7 +256,7 @@ export async function compile(
     );
     await mkdir(cache(), { recursive: true, mode: 0o700 });
     try {
-      await stat(join(cache(), artifact + ".pdf"));
+      await readArtifact(owner, artifact);
       const log = await readFile(join(cache(), artifact + ".log"), "utf8");
       return {
         ok: true,

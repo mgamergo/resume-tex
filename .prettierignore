@@ -1,0 +1,13 @@
+.next
+.tools
+.data
+artifacts
+bun.lock
+node_modules
+
+AGENTS.md
+
+public/pdf.worker.min.mjs
+playwright-report
+test-results
+next-env.d.ts

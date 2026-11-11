@@ -1,4 +1,10 @@
-import { resumeSchema, revisionSchema, proposalSchema } from "../core/schemas";
+import {
+  resumeSchema,
+  resumeSummarySchema,
+  revisionSchema,
+  proposalSchema,
+  revisionSummarySchema,
+} from "../core/schemas";
 import { z } from "zod";
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
@@ -12,6 +18,8 @@ import {
   type ProposalInput,
   type Resume,
   type Revision,
+  type RevisionSummary,
+  type ResumeSummary,
 } from "../core/model";
 import { digest } from "../core/digest";
 let database: Database.Database | undefined;
@@ -38,12 +46,14 @@ function rowBody<T>(schema: z.ZodType<T>, row: unknown): T | undefined {
 }
 export class LocalStore {
   constructor(private owner: string) {}
-  async list(): Promise<Resume[]> {
+  async list(): Promise<ResumeSummary[]> {
     return db()
-      .prepare("SELECT body FROM documents WHERE owner=?")
+      .prepare(
+        "SELECT json_remove(body,'$.source') AS body FROM documents WHERE owner=?",
+      )
       .all(this.owner)
-      .map((row) => rowBody(resumeSchema, row))
-      .filter((v): v is Resume => !!v)
+      .map((row) => rowBody(resumeSummarySchema, row))
+      .filter((v): v is ResumeSummary => !!v)
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
   async get(id: string): Promise<Resume> {
@@ -139,15 +149,36 @@ export class LocalStore {
         .run(id, this.owner);
     })();
   }
-  async history(id: string): Promise<Revision[]> {
+  async history(id: string): Promise<RevisionSummary[]> {
     await this.get(id);
     return db()
       .prepare(
-        "SELECT body FROM revisions WHERE resume_id=? AND owner=? ORDER BY revision DESC LIMIT 100",
+        "SELECT json_remove(body,'$.source') AS body FROM revisions WHERE resume_id=? AND owner=? ORDER BY revision DESC LIMIT 100",
       )
       .all(id, this.owner)
-      .map((row) => rowBody(revisionSchema, row))
-      .filter((v): v is Revision => !!v);
+      .map((row) => {
+        if (
+          typeof row !== "object" ||
+          !row ||
+          !("body" in row) ||
+          typeof row.body !== "string"
+        )
+          throw new Error("Invalid persisted revision");
+        return revisionSummarySchema.parse(JSON.parse(row.body));
+      });
+  }
+  async revision(id: string, revision: number): Promise<Revision> {
+    await this.get(id);
+    const value = rowBody(
+      revisionSchema,
+      db()
+        .prepare(
+          "SELECT body FROM revisions WHERE resume_id=? AND owner=? AND revision=?",
+        )
+        .get(id, this.owner, revision),
+    );
+    if (!value) throw new DomainError("Revision not found", 404);
+    return value;
   }
   async propose(id: string, input: ProposalInput): Promise<Proposal> {
     const current = await this.get(id);

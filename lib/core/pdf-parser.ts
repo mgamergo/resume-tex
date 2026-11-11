@@ -100,18 +100,39 @@ export function parseFields(
     const after = line
       .slice(line.indexOf(raw) + raw.length)
       .replace(/^[|,\s]+/g, "");
-    const title = before || after || experienceLines[index - 1] || "";
+    const previous = experienceLines[index - 1] ?? "";
+    const previousPrevious = experienceLines[index - 2] ?? "";
+    const next = experienceLines[index + 1] ?? "";
+    const rolePattern =
+      /engineer|developer|manager|designer|analyst|director|specialist|consultant|assistant|lead|intern/i;
+    const bulletPattern =
+      /^(?:[•○-])|\b(?:built|reduced|maintained|developed|designed|led|managed)\b/i;
+    const title = before || (rolePattern.test(after) ? after : previous);
     const pieces = title.split(/\s*[|,]\s*/);
-    const employerCandidate = experienceLines[index + 1] ?? "";
-    const employer =
-      pieces[1] ??
-      (!/^(?:•|[-–])|\b(?:built|reduced|maintained|developed|designed|led|managed)\b/i.test(
-        employerCandidate,
-      )
-        ? employerCandidate
-        : null);
+    let role: string | null = null;
+    let employer: string | null = null;
+    if (pieces.length > 1 && pieces.some((piece) => rolePattern.test(piece))) {
+      role = pieces.find((piece) => rolePattern.test(piece)) ?? null;
+      employer = pieces.find((piece) => piece !== role) ?? null;
+    } else if (rolePattern.test(title)) {
+      role = title;
+      employer = before
+        ? previous &&
+          !rolePattern.test(previous) &&
+          !bulletPattern.test(previous)
+          ? previous
+          : !bulletPattern.test(next)
+            ? next
+            : null
+        : null;
+    } else if (rolePattern.test(previousPrevious)) {
+      role = previousPrevious;
+      employer = previous;
+    } else {
+      role = title || null;
+    }
     experience.push({
-      role: pieces[0] || null,
+      role,
       employer,
       dates: raw,
       evidence: experienceLines
@@ -120,7 +141,7 @@ export function parseFields(
           Math.min(experienceLines.length, index + 4),
         )
         .join("\n"),
-      confidence: pieces[0] && employer ? "medium" : "low",
+      confidence: role && employer ? "medium" : "low",
     });
   }
   if (!experience.length && sections.experience)
@@ -132,43 +153,70 @@ export function parseFields(
       confidence: "low",
     });
   const education: ParsedFields["education"] = [];
-  if (sections.education) {
-    const institution =
-      sections.education
-        .match(/[^\n]*(?:University|College|Institute|School)[^\n]*/i)?.[0]
-        ?.replace(rangePattern, "")
-        .trim() ?? null;
+  const educationLines = sections.education
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const institutionIndexes = educationLines.flatMap((line, index) =>
+    /(?:University|College|Institute|School)/i.test(line) ? [index] : [],
+  );
+  for (const [position, index] of institutionIndexes.entries()) {
+    const evidence = educationLines
+      .slice(index, institutionIndexes[position + 1] ?? educationLines.length)
+      .join("\n");
+    const institution = educationLines[index].replace(rangePattern, "").trim();
     const degree =
-      sections.education
+      evidence
         .match(
           /[^\n]*(?:B\.\s?S\.|M\.\s?S\.|Bachelor|Master|Ph\.?D|degree)[^\n]*/i,
         )?.[0]
-        ?.trim() ?? null;
+        ?.replace(rangePattern, "")
+        .trim() ?? null;
     education.push({
       institution,
       degree,
-      dates: parseDateRanges(sections.education)[0]?.raw ?? null,
-      evidence: sections.education,
-      confidence: institution && degree ? "medium" : "low",
+      dates: parseDateRanges(evidence)[0]?.raw ?? null,
+      evidence,
+      confidence: degree ? "medium" : "low",
     });
   }
+  if (!education.length && sections.education)
+    education.push({
+      institution: null,
+      degree: null,
+      dates: parseDateRanges(sections.education)[0]?.raw ?? null,
+      evidence: sections.education,
+      confidence: "low",
+    });
+  const firstSection = lines.findIndex((line) =>
+    /^(?:experience|education|skills|projects|summary)$/i.test(line),
+  );
+  const headerLines = lines.slice(0, firstSection > 0 ? firstSection : 8);
+  const header = headerLines.join("\n");
+  const phone =
+    (header.match(/\+?\(?\d[\d ()~-]{7,}\d/g) ?? []).find((candidate) => {
+      const digits = candidate.replace(/\D/g, "");
+      return (
+        digits.length >= 10 &&
+        digits.length <= 15 &&
+        !parseDateRanges(candidate).length
+      );
+    }) ?? null;
   const contact = {
-    name: lines[0] ?? "",
-    email: pdf.text.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i)?.[0] ?? null,
-    phone: pdf.text.match(/(?:\+?\d[\d ()~-]{7,}\d)/)?.[0] ?? null,
+    name: (lines[0] ?? "").split("|")[0].replace(/\s+/g, " ").trim(),
+    email: header.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i)?.[0] ?? null,
+    phone,
     links: [
       ...new Set(
-        pdf.text.match(
+        header.match(
           /(?:https?:\/\/)?(?:linkedin\.com|github\.com|[a-z0-9-]+\.(?:dev|io))\/[\w/-]+/gi,
         ) ?? [],
       ),
     ],
     location:
-      lines
-        .slice(0, 8)
-        .find((line) =>
-          /\b[A-Za-z .]+,\s*(?:[A-Z]{2}|[A-Za-z ]+)(?:\s|$|[|])/u.test(line),
-        ) ?? null,
+      header
+        .match(/(?:^|[|\n])\s*([A-Z][A-Za-z .]+,\s*[A-Z]{2})\b/)?.[1]
+        ?.trim() ?? null,
   };
   const skills = [
     ...new Set(
@@ -179,7 +227,14 @@ export function parseFields(
         )
         .split(/[,\n|•]+/)
         .map((skill) => skill.trim())
-        .filter((skill) => skill && skill.length < 70),
+        .filter(
+          (skill) =>
+            skill &&
+            skill.length < 70 &&
+            !/^(?:Languages|Frameworks|Tools|Technologies|Libraries)$/i.test(
+              skill,
+            ),
+        ),
     ),
   ];
   return {

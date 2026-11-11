@@ -4,19 +4,17 @@
   "private": true,
   "packageManager": "bun@1.4.4",
   "scripts": {
-    "dev": "bun --bun next dev --hostname 127.0.0.1",
-    "build": "bun --bun next build",
+    "dev": "bun scripts/prepare-assets.ts && bun --bun next dev --hostname 127.0.0.1",
+    "build": "bun scripts/prepare-assets.ts && bun --bun next build",
     "start": "bun --bun next start --hostname 127.0.0.1",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "bun test tests/unit && vitest run tests/convex.test.ts",
+    "test": "bun scripts/prepare-assets.ts && bun test tests/unit && vitest run tests/convex.test.ts",
     "test:e2e": "playwright test",
     "setup:tex": "bash scripts/setup-tex.sh",
-    "mcp": "bun scripts/mcp.ts",
-    "predev": "bun scripts/prepare-assets.ts",
-    "prebuild": "bun scripts/prepare-assets.ts"
+    "mcp": "bun scripts/mcp.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.25",
@@ -62,7 +60,7 @@
     "prettier": "^3.9.10",
     "tailwindcss": "^4.3.5",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
+    "typescript": "6",
     "vitest": "^5.1.0"
   }
 }

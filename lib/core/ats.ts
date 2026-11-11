@@ -1,3 +1,4 @@
+import type { Engine } from "./model";
 import { parseFields, type ParsedFields } from "./pdf-parser";
 export type PdfWord = {
   text: string;
@@ -32,6 +33,8 @@ export type AtsReport = {
   digest: string;
   artifact: string;
   score: number;
+  engine: Engine;
+  revision: number;
   breakdown: {
     name: string;
     earned: number;
@@ -89,7 +92,7 @@ const skills = [
   "c#",
 ];
 const synonyms: Record<string, string[]> = {
-  javascript: ["js"],
+  javascript: [],
   typescript: ["ts"],
   "node.js": ["nodejs", "node js"],
   "next.js": ["nextjs", "next js"],
@@ -103,6 +106,7 @@ const synonyms: Record<string, string[]> = {
   communication: ["communicate", "communicating"],
   leadership: ["led", "mentored", "managed"],
 };
+export const knownSkills = skills;
 const stop = new Set(
   "the and for with that this you your are our will have has from can all into who what how but more must required preferred experience years year work working role team using use strong skills ability including such or of to in a an on is be we as at by it not about through understanding knowledge looking join responsibilities qualifications requirements candidates candidate job position company benefits excellent good proven new development software engineer engineering ideal well demonstrated related degree equivalent plus minimum familiar familiarity proficient proficiency design build develop maintain needed should seeking successful passion support technical technology technologies systems services applications tools projects business based includes across within other also least highly bachelor relevant ensure demonstrate building developing teams provide preferred requirement requirement nice need expertise apply professional world impact product products solutions opportunity equal remote salary time location employment description level hands hands-on stakeholders people help make day looking track record environment deliver collaborate collaboration full stack computer science manage management designing implementing implementing following".split(
     /\s+/,
@@ -226,6 +230,10 @@ export function analyzePdf(
   jd: string,
   digest: string,
   artifact: string,
+  context: { engine: Engine; revision: number } = {
+    engine: "pdflatex",
+    revision: 0,
+  },
 ): AtsReport {
   const text = pdf.text;
   const wordCount = (text.match(/\S+/g) ?? []).length;
@@ -292,10 +300,21 @@ export function analyzePdf(
   const findings: Finding[] = [
     {
       id: "contact",
-      level: contact.length >= 2 ? "pass" : "warning",
+      level:
+        [
+          parsed.contact.email,
+          parsed.contact.phone,
+          ...parsed.contact.links,
+        ].filter(Boolean).length >= 2
+          ? "pass"
+          : "warning",
       title: "Contact details",
       detail:
-        contact.length >= 2
+        [
+          parsed.contact.email,
+          parsed.contact.phone,
+          ...parsed.contact.links,
+        ].filter(Boolean).length >= 2
           ? "Email and a second contact method were extracted."
           : "Add a selectable email and phone or profile URL.",
     },
@@ -394,7 +413,13 @@ export function analyzePdf(
       name: "Structure & contact",
       earned:
         Math.round((essentialSections / 3) * 15) +
-        (contact.length >= 2 ? 5 : 0),
+        ([
+          parsed.contact.email,
+          parsed.contact.phone,
+          ...parsed.contact.links,
+        ].filter(Boolean).length >= 2
+          ? 5
+          : 0),
       possible: 20,
       detail: "Three recognizable core headings and contact details.",
     },
@@ -425,6 +450,7 @@ export function analyzePdf(
   return {
     digest,
     artifact,
+    ...context,
     score: Math.round(
       (breakdown.reduce((sum, b) => sum + b.earned, 0) /
         breakdown.reduce((sum, b) => sum + b.possible, 0)) *

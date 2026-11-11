@@ -1,5 +1,14 @@
 # Logbook
 
+## 2026-11-11 — Assistant, PDF analysis and connected storage
+
+- Structured tools are shared by HTTP assistant and authenticated stdio MCP. Provider requests bind to the pre-request source digest; clients also supply their base digest. Exact range limits reject full rewrites. New numeric/known-skill claims require existing source or explicit author evidence. UI approval remains separate from MCP.
+- Real OpenAI-compatible HTTP function-call adapter has a loopback protocol fixture. Offline mode is explicitly deterministic. MCP SDK initialize/list/read/propose and stale-base tests pass.
+- ATS now parses actual compiled PDF text/geometry, named fields with evidence/confidence, multiple degrees, date styles/reversed ranges, heading-scoped JD requirements, synonym/stem matches and BM25 weights. Source hints remain separately labeled. Vendor/Workday limits and all score weights are documented.
+- PDF parsing runs in a clean-env, deadline/CPU/address-space/heap/output-limited Node worker. Regular temporary descriptors avoid a Bun/Node pipe failure observed in tests. All temporary input/output/log files are bounded and removed. Compiler resource probes demonstrate kernel tmpfs/file bounds, CPU termination, deadline cleanup and queue recovery.
+- Convex list/history use indexed small summaries and lazy single-version source reads. Delete schedules bounded private cleanup. Expected auth/not-found/CAS/stale errors carry validated ConvexError status data, preserving HTTP semantics. Emulator identity/CAS/history tests are distinct from live Clerk verification.
+- `bun run typecheck` and `bun run lint` pass. Current `bun run test` passes 27 Bun tests / 173 assertions plus 2 Convex emulator tests. Main production browser workflow and responsive/template flow pass; extra race/failure cases are being stabilized. Live Clerk/Convex deployment and live LLM verification remain human-key setup.
+
 ## 2026-11-11 — Verified core checkpoint
 
 - Added immutable SQLite revisions, digest+revision CAS, owner-scoped Convex functions and exact proposal review. Source remains authoritative.

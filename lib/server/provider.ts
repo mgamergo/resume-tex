@@ -139,7 +139,7 @@ export class CompatibleProvider implements AssistantProvider {
                 name: "propose_edit",
                 description:
                   "Select a structured read or bounded proposal tool",
-                parameters: z.toJSONSchema(toolCallSchema),
+                parameters: z.toJSONSchema(z.object({ call: toolCallSchema })),
               },
             },
           ],
@@ -163,7 +163,9 @@ export class CompatibleProvider implements AssistantProvider {
         "Provider did not return a structured tool call",
         502,
       );
-    return toolCallSchema.parse(JSON.parse(call.function.arguments));
+    return z
+      .object({ call: toolCallSchema })
+      .parse(JSON.parse(call.function.arguments)).call;
   }
 }
 export function provider(): AssistantProvider {

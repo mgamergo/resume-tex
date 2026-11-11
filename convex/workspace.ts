@@ -1,12 +1,15 @@
 import {
   queryGeneric,
   mutationGeneric,
+  internalMutationGeneric,
+  makeFunctionReference,
   type GenericQueryCtx,
   type GenericMutationCtx,
   type DataModelFromSchemaDefinition,
   type QueryBuilder,
   type MutationBuilder,
 } from "convex/server";
+import { ConvexError } from "convex/values";
 import { v } from "convex/values";
 import { z } from "zod";
 import {
@@ -19,13 +22,23 @@ import {
   type Revision,
 } from "../lib/core/model";
 import schema from "./schema";
+import {
+  resumeSchema,
+  resumeSummarySchema,
+  revisionSchema,
+  proposalSchema,
+  revisionSummarySchema,
+} from "../lib/core/schemas";
 type DataModel = DataModelFromSchemaDefinition<typeof schema>;
 const query: QueryBuilder<DataModel, "public"> = queryGeneric;
 const mutation: MutationBuilder<DataModel, "public"> = mutationGeneric;
+const internalMutation: MutationBuilder<DataModel, "internal"> =
+  internalMutationGeneric;
 const idSchema = z.string().min(1).max(100);
 const payloadSchema = z
   .object({
     id: idSchema.optional(),
+    revision: z.number().int().optional(),
     name: z.string().min(1).max(80).optional(),
     source: sourceSchema.optional(),
     engine: engineSchema.optional(),
@@ -42,7 +55,13 @@ type Ctx = GenericQueryCtx<DataModel>;
 type MutableCtx = GenericMutationCtx<DataModel>;
 async function ownerOf(ctx: Ctx) {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new Error("Authentication required");
+  if (!identity)
+    throw new ConvexError({
+      kind: "resume-tex",
+      status: 401,
+      code: "unauthenticated",
+      message: "Authentication required",
+    });
   return identity.subject;
 }
 async function row(ctx: Ctx, owner: string, kind: string, key: string) {
@@ -55,8 +74,14 @@ async function row(ctx: Ctx, owner: string, kind: string, key: string) {
 }
 async function get(ctx: Ctx, owner: string, id: string): Promise<Resume> {
   const value = await row(ctx, owner, "resume", id);
-  if (!value) throw new Error("Resume not found");
-  return JSON.parse(value.body);
+  if (!value)
+    throw new ConvexError({
+      kind: "resume-tex",
+      status: 404,
+      code: "not_found",
+      message: "Resume not found",
+    });
+  return resumeSchema.parse(JSON.parse(value.body));
 }
 async function hash(source: string) {
   return Array.from(
@@ -89,6 +114,27 @@ async function writeResume(
     resumeId: resume.id,
     body: JSON.stringify({ ...resume, note } satisfies Revision),
   });
+  const { source: listingSource, ...listing } = resume;
+  void listingSource;
+  const existingListing = await row(ctx, owner, "listing", resume.id);
+  const listingFields = {
+    owner,
+    kind: "listing",
+    key: resume.id,
+    resumeId: resume.id,
+    body: JSON.stringify(listing),
+  };
+  if (existingListing) await ctx.db.replace(existingListing._id, listingFields);
+  else await ctx.db.insert("records", listingFields);
+  const { source: _source, ...summary } = { ...resume, note };
+  void _source;
+  await ctx.db.insert("records", {
+    owner,
+    kind: "history",
+    key: `${resume.id}:${resume.revision}`,
+    resumeId: resume.id,
+    body: JSON.stringify(summary),
+  });
 }
 export const read = query({
   args: { op: v.string(), payload: v.string() },
@@ -98,17 +144,33 @@ export const read = query({
     if (args.op === "list") {
       const rows = await ctx.db
         .query("records")
-        .withIndex("by_key", (q) => q.eq("owner", owner).eq("kind", "resume"))
+        .withIndex("by_key", (q) => q.eq("owner", owner).eq("kind", "listing"))
         .take(51);
       return rows
-        .filter((r) => r.kind === "resume")
-        .map((r) => JSON.parse(r.body));
+        .filter((r) => r.kind === "listing")
+        .map((r) => resumeSummarySchema.parse(JSON.parse(r.body)));
     }
     const id = idSchema.parse(input.id);
     const current = await get(ctx, owner, id);
     if (args.op === "get") return current;
+    if (args.op === "revision") {
+      const value = await row(
+        ctx,
+        owner,
+        "revision",
+        `${id}:${z.number().int().parse(input.revision)}`,
+      );
+      if (!value)
+        throw new ConvexError({
+          kind: "resume-tex",
+          status: 404,
+          code: "not_found",
+          message: "Revision not found",
+        });
+      return revisionSchema.parse(JSON.parse(value.body));
+    }
     if (args.op === "history" || args.op === "proposals") {
-      const kind = args.op === "history" ? "revision" : "proposal";
+      const kind = args.op === "history" ? "history" : "proposal";
       const rows = await ctx.db
         .query("records")
         .withIndex("by_resume", (q) =>
@@ -116,13 +178,20 @@ export const read = query({
         )
         .order("desc")
         .take(100);
+      if (kind === "history")
+        return rows
+          .map((r) => revisionSummarySchema.parse(JSON.parse(r.body)))
+          .sort((a, b) => b.revision - a.revision);
       return rows
-        .map((r) => JSON.parse(r.body))
-        .sort(
-          (a, b) => (b.revision ?? b.createdAt) - (a.revision ?? a.createdAt),
-        );
+        .map((r) => proposalSchema.parse(JSON.parse(r.body)))
+        .sort((a, b) => b.createdAt - a.createdAt);
     }
-    throw new Error("Unknown operation");
+    throw new ConvexError({
+      kind: "resume-tex",
+      status: 400,
+      code: "invalid",
+      message: "Unknown operation",
+    });
   },
 });
 export const write = mutation({
@@ -133,10 +202,15 @@ export const write = mutation({
     if (args.op === "create") {
       const existing = await ctx.db
         .query("records")
-        .withIndex("by_key", (q) => q.eq("owner", owner).eq("kind", "resume"))
+        .withIndex("by_key", (q) => q.eq("owner", owner).eq("kind", "listing"))
         .take(51);
-      if (existing.filter((r) => r.kind === "resume").length >= 50)
-        throw new Error("Resume limit reached");
+      if (existing.filter((r) => r.kind === "listing").length >= 50)
+        throw new ConvexError({
+          kind: "resume-tex",
+          status: 429,
+          code: "limit",
+          message: "Resume limit reached",
+        });
       const source = sourceSchema.parse(input.source);
       const resume: Resume = {
         id: crypto.randomUUID(),
@@ -154,12 +228,15 @@ export const write = mutation({
     const id = idSchema.parse(input.id);
     const current = await get(ctx, owner, id);
     if (args.op === "remove") {
-      const rows = await ctx.db
-        .query("records")
-        .withIndex("by_resume", (q) => q.eq("owner", owner).eq("resumeId", id))
-        .take(2000);
-      for (const r of rows.filter((r) => r.resumeId === id))
-        await ctx.db.delete(r._id);
+      const doc = await row(ctx, owner, "resume", id);
+      if (doc) await ctx.db.delete(doc._id);
+      const listing = await row(ctx, owner, "listing", id);
+      if (listing) await ctx.db.delete(listing._id);
+      await ctx.scheduler.runAfter(
+        0,
+        makeFunctionReference<"mutation">("workspace:cleanup"),
+        { owner, id },
+      );
       return;
     }
     if (args.op === "save") {
@@ -167,7 +244,12 @@ export const write = mutation({
         current.digest !== input.baseDigest ||
         current.revision !== input.expectedRevision
       )
-        throw new Error("Revision conflict");
+        throw new ConvexError({
+          kind: "resume-tex",
+          status: 409,
+          code: "conflict",
+          message: "Revision conflict",
+        });
       const source = sourceSchema.parse(input.source);
       const next = {
         ...current,
@@ -184,7 +266,12 @@ export const write = mutation({
     if (args.op === "propose") {
       const proposalInput = proposalInputSchema.parse(input.input);
       if (current.digest !== proposalInput.baseDigest)
-        throw new Error("Stale proposal");
+        throw new ConvexError({
+          kind: "resume-tex",
+          status: 409,
+          code: "conflict",
+          message: "Stale proposal",
+        });
       applyEdits(current.source, proposalInput.edits);
       const proposal: Proposal = {
         ...proposalInput,
@@ -210,13 +297,28 @@ export const write = mutation({
         idSchema.parse(input.proposalId),
       );
       if (!proposalRow || proposalRow.resumeId !== id)
-        throw new Error("Proposal not found");
-      const proposal: Proposal = JSON.parse(proposalRow.body);
+        throw new ConvexError({
+          kind: "resume-tex",
+          status: 404,
+          code: "not_found",
+          message: "Proposal not found",
+        });
+      const proposal = proposalSchema.parse(JSON.parse(proposalRow.body));
       if (proposal.status !== "pending")
-        throw new Error("Proposal already reviewed");
+        throw new ConvexError({
+          kind: "resume-tex",
+          status: 409,
+          code: "conflict",
+          message: "Proposal already reviewed",
+        });
       if (input.accept) {
         if (current.digest !== proposal.baseDigest)
-          throw new Error("Stale proposal");
+          throw new ConvexError({
+            kind: "resume-tex",
+            status: 409,
+            code: "conflict",
+            message: "Stale proposal",
+          });
         const source = applyEdits(current.source, proposal.edits);
         const next = {
           ...current,
@@ -236,6 +338,30 @@ export const write = mutation({
       });
       return current;
     }
-    throw new Error("Unknown operation");
+    throw new ConvexError({
+      kind: "resume-tex",
+      status: 400,
+      code: "invalid",
+      message: "Unknown operation",
+    });
+  },
+});
+
+export const cleanup = internalMutation({
+  args: { owner: v.string(), id: v.string() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("records")
+      .withIndex("by_resume", (q) =>
+        q.eq("owner", args.owner).eq("resumeId", args.id),
+      )
+      .take(5);
+    for (const item of rows) await ctx.db.delete(item._id);
+    if (rows.length === 5)
+      await ctx.scheduler.runAfter(
+        0,
+        makeFunctionReference<"mutation">("workspace:cleanup"),
+        args,
+      );
   },
 });

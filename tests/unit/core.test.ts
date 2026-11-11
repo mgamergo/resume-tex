@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll } from "bun:test";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -7,6 +7,7 @@ import { LocalStore } from "../../lib/server/local-store";
 import { applyEdits } from "../../lib/core/model";
 import { templates } from "../../lib/core/templates";
 import { compile, readArtifact, sandboxArgs } from "../../lib/server/compiler";
+import { analyzePdf } from "../../lib/core/ats";
 import { extractPdf } from "../../lib/server/pdf-text";
 import { buildProposal } from "../../lib/server/tools";
 let store: LocalStore;
@@ -96,10 +97,7 @@ describe("authoritative source and immutable history", () => {
       note: "Restored revision 1",
     });
     expect(restored.revision).toBe(5);
-    expect(
-      (await store.history(doc.id)).find((revision) => revision.revision === 3)
-        ?.source,
-    ).toBe(accepted.source);
+    expect((await store.revision(doc.id, 3)).source).toBe(accepted.source);
   });
 });
 describe("isolated actual TeX compiler", () => {
@@ -167,6 +165,19 @@ describe("isolated actual TeX compiler", () => {
       expect(pdf.text).toContain("TypeScript");
       expect(pdf.words.length).toBeGreaterThan(30);
       expect(pdf.pages).toBe(1);
+      const analysis = analyzePdf(
+        pdf,
+        template.source,
+        "Required React and TypeScript",
+        result.digest,
+        result.artifact,
+      );
+      expect(analysis.parsed.contact.email).toBe("alex@example.com");
+      expect(analysis.parsed.experience[0].role).toContain("Software Engineer");
+      expect(analysis.parsed.education[0].institution).toContain(
+        "University of California",
+      );
+      expect(analysis.parsed.skills).toContain("React");
       const cached = await compile(
         "template-tests",
         template.source,

@@ -1,0 +1,10 @@
+# Template provenance
+
+`lib/core/templates.ts` contains four distinct original starter sources written for Resume TeX. All use explicitly fictional Alex Morgan sample data. The tiny dashboard illustrations are schematic layout thumbnails; the workspace always renders a real compiled PDF.
+
+- **Jake's Resume** follows the familiar single-column technical-resume layout popularized by [jakegut/resume](https://github.com/jakegut/resume). This is an original adaptation with a smaller local macro surface, not a verbatim copy of Jake Gutierrez's source. The upstream project uses MIT. No upstream code or license text is represented as ours.
+- **Deedy** is an original two-column adaptation inspired by [deedy/Deedy-Resume](https://github.com/deedy/Deedy-Resume). It uses XeLaTeX and TeX Gyre Heros to avoid proprietary/macOS-only fonts. It does not embed Deedy's class or original Apache-2.0 source. It preserves the characteristic education/skills sidebar and career column, with different source implementation.
+- **AltaCV-style** is an original article/minipage layout inspired by [liantze/AltaCV](https://github.com/liantze/AltaCV), with a blue accent and right sidebar. It does not embed AltaCV's class, icon implementation or sample code and is labeled style rather than an official AltaCV template. It has the usual multi-column parsing tradeoff.
+- **moderncv** uses the actual TeX Live [moderncv](https://ctan.org/pkg/moderncv) document class, banking style and blue theme. The user-local runtime includes its dependencies and their licenses; moderncv is LPPL-1.3c. The application starter source is original and does not modify the upstream class.
+
+The TinyTeX/TeX Live distribution retains package license files in its runtime tree. Fonts are distributed by their upstream packages. The app does not relicense third-party packages. Existing user LaTeX can be edited freely; a single source file is supported in v1. Additional custom classes, local images and uploaded project bundles are not supported.
