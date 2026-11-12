@@ -1,5 +1,9 @@
 # Logbook
 
+## 2026-11-12 — PR opened
+
+Opened https://github.com/mgamergo/resume-tex/pull/1 from dev to main. GitHub reports MERGEABLE/CLEAN with no conflicts. Preserved the old dev tip at backup/dev-before-main-rebase-20261112 and pushed the rebase with an exact lease. Repository remains private; main is unchanged. Verification and cleanup are recorded below. The existing box and private preview remain running.
+
 ## 2026-11-12 — Rebased PR verified
 
 Combined candidate `b8ec52a600bf42ccf3f082ac6872628454f92bc5` passed trusted TeX setup, shell syntax, formatting, application/Convex typechecks, lint, build, 50 Bun tests/321 assertions, three Convex tests and 12 real-service Chromium cases in 4.9 minutes. An actual sandbox compile and PDF text extraction also passed with fullpage, Babel English and titlesec together. Nine diagnostic arrays are empty; two exact in-flight navigation cancellations remain separately recorded. Test users/documents were cleaned, test3100 stopped, and the existing box keeps the private preview. Marker and immutable captures are indexed in artifacts/pr-main-sync-evidence.json. The final documentation-only record does not change the tested digest.
