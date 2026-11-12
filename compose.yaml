@@ -1,0 +1,52 @@
+services:
+  resume-tex:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:?Set the Clerk publishable key}
+        NEXT_PUBLIC_CONVEX_URL: ${NEXT_PUBLIC_CONVEX_URL:?Set the Convex URL}
+        NEXT_PUBLIC_CONVEX_SITE_URL: ${NEXT_PUBLIC_CONVEX_SITE_URL:?Set the Convex site URL}
+    environment:
+      APP_ORIGIN: ${APP_ORIGIN:?Set the HTTPS application origin}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:?Set the Clerk publishable key}
+      NEXT_PUBLIC_CONVEX_URL: ${NEXT_PUBLIC_CONVEX_URL:?Set the Convex URL}
+      NEXT_PUBLIC_CONVEX_SITE_URL: ${NEXT_PUBLIC_CONVEX_SITE_URL:?Set the Convex site URL}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:?Set the Clerk secret key}
+      AI_BASE_URL: ${AI_BASE_URL:?Set the model API base URL}
+      AI_MODEL: ${AI_MODEL:?Set the model name}
+      AI_API_KEY: ${AI_API_KEY:?Set the model API key}
+    user: "10001:10001"
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+      - seccomp:unconfined
+      - apparmor:unconfined
+      - systempaths=unconfined
+    cpus: 2
+    mem_limit: 2g
+    pids_limit: 256
+    deploy:
+      replicas: 1
+    volumes:
+      - resume-data:/app/.data
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        - CMD
+        - /usr/local/bin/node
+        - -e
+        - fetch('http://127.0.0.1:3000/',{signal:AbortSignal.timeout(5000)}).then(r=>process.exit(r.status<400?0:1)).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+volumes:
+  resume-data:

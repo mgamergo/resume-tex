@@ -1,5 +1,9 @@
 # Logbook
 
+## 2026-11-12 — Dokploy deployment preparation
+
+Authorized deployment targets the existing Chaitanya project and resume-tex.buildwithkuro.tech. Added a nonroot Node 22/Bun image with trusted TeX provisioning, public-only build arguments, explicit runtime settings and persistent PDF cache. Compose retains Bubblewrap isolation without host capabilities or privileged mode. A server probe demonstrated nested namespaces need service-scoped seccomp/AppArmor options and systempaths=unconfined; the default masked proc mount failed. Actual image compilation and live verification remain pending. Production Infisical is empty, so this deployment uses the existing development service configuration. Existing unrelated services and the same devbox are preserved.
+
 ## 2026-11-12 — Autonomy PR opened
 
 Opened https://github.com/mgamergo/resume-tex/pull/2 from dev to main for per-resume autonomous agent editing. Dev includes the current main without conflicts. The PR records the separate baseline and correction checks and the two-round Sol approval. This commit updates project memory only. Repository remains private; the same box and preview are preserved.
