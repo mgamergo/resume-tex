@@ -21,4 +21,8 @@ Baseline behavior `4906819` passed format, application/Convex types, lint, build
 
 Correction behavior `aa8827b` passed fresh format/types/lint/build, the same unit suites and the added real-service deletion regression. The baseline and correction evidence are separately identified in artifacts/autonomy-sol-evidence.json. Current diagnostic reports contain no unexpected errors; test-owned identities and the test server are cleaned. The same box retains the private preview.
 
-Round 2 checks only the open findings and changed code.
+## Round 2
+
+Approved clean `585f1e1`: S1 and S2 resolved, no new findings and no further fix needed. The reviewer checked only the open findings and changed code, verified artifact hashes and all 12 empty diagnostic arrays, and ran no suites or browsers. Both rounds used gpt-6.1-sol on high reasoning. Usage was not returned. No findings were declined.
+
+Final diff: 23 files, 2,031 insertions and 237 deletions. The growth after round 1 consists of the focused regression and review documentation; the runtime correction remains four cleanup statements. This approval record changes documentation only.

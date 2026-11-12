@@ -1,5 +1,9 @@
 # Logbook
 
+## 2026-11-12 — Autonomy Sol approval
+
+Sol round 2 approved clean `585f1e1`: both deletion findings resolved, no new findings. Two rounds used gpt-6.1-sol on high reasoning; usage was not returned. The tested behavior remains `aa8827b`, with baseline full 16-case and final focused correction evidence kept separate. This record changes documentation only. Push to dev follows; the same box and private preview remain running.
+
 ## 2026-11-12 — Sol deletion corrections
 
 Sol round 1 found retained conflict state after deletion (S1, should) and a related retained apply lock (S2, nit). Four successful-deletion cleanup statements address both. Clean behavior `aa8827b` passed fresh formatting, types, lint, build, 55 Bun tests/337 assertions, 11 Convex tests and a real-service conflict/delete/create plus held-accept/delete/create regression. Baseline full 16-case results remain separate. Current diagnostics are empty and test resources cleaned. Ledger: docs/agent-autonomy-sol-review.md. Fresh scoped recheck follows before push.
