@@ -1,5 +1,9 @@
 # Logbook
 
+## 2026-11-12 — Autonomy PR opened
+
+Opened https://github.com/mgamergo/resume-tex/pull/2 from dev to main for per-resume autonomous agent editing. Dev includes the current main without conflicts. The PR records the separate baseline and correction checks and the two-round Sol approval. This commit updates project memory only. Repository remains private; the same box and preview are preserved.
+
 ## 2026-11-12 — Autonomy Sol approval
 
 Sol round 2 approved clean `585f1e1`: both deletion findings resolved, no new findings. Two rounds used gpt-6.1-sol on high reasoning; usage was not returned. The tested behavior remains `aa8827b`, with baseline full 16-case and final focused correction evidence kept separate. This record changes documentation only. Push to dev follows; the same box and private preview remain running.
