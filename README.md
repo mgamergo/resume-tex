@@ -29,6 +29,8 @@ infisical secrets-manager run \
 
 Sign in to access your private Convex workspace. The server validates Clerk sessions and Convex independently derives document ownership from the Clerk JWT. Missing service configuration remains an error. Historical local documents are preserved on disk but do not appear in the connected app and are not migrated. Historical browser draft keys are untouched and no longer read or written.
 
+For the hosted service, image policy and redeployment steps, see [Dokploy deployment](docs/deployment.md).
+
 ## Editing
 
 Choose one of four blank layouts: Jake's Resume, Deedy, AltaCV-style, or moderncv. [Template attribution](docs/templates.md) describes their adaptations and engines. Add your own verified details.
@@ -39,7 +41,7 @@ The theme follows the operating system by default, including live changes. Choos
 
 ## Assistant and ATS
 
-The assistant requires `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY`. It sends a real structured function-call request; all edits become exact, digest-bound proposals requiring review. Unsupported new metrics and named skills require author evidence. Review factual accuracy before accepting a change.
+The assistant requires `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY`. It sends a real structured function-call request; edits become exact, digest-bound proposals. Review is the default; the per-resume Agent edits setting can apply validated changes automatically. See [agent autonomy](docs/agent-autonomy.md). Unsupported new metrics and named skills require author evidence. Review factual accuracy before accepting a change.
 
 ATS checks parse the compiled PDF, including text order, contact fields, dates, headings, columns, and job keywords. They are a heuristic, not an external vendor score. See [methodology](docs/ats-methodology.md), [tools and authenticated MCP](docs/agent-tools.md), and [sandbox architecture](docs/architecture.md).
 

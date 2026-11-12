@@ -1,5 +1,9 @@
 # Logbook
 
+## 2026-11-12 — Dokploy deployment verified
+
+Deployed reviewed behavior 8d4058d to https://resume-tex.buildwithkuro.tech as resume-tex in the existing Chaitanya project. Private dev source, automatic deploy disabled, allowlisted development Infisical settings, DNS and valid Let's Encrypt HTTPS. The actual nonroot/cap-drop container passed its sandbox probe and remains healthy. Format/types/lint, 55 Bun tests/337 assertions and 11 Convex tests pass; four live Chromium cases completed with exit0, three empty diagnostic reports and cleaned test identities. Earlier DNS/Clerk and supervisor failures remain separate, with session output redacted. One Sol round approved without findings. Evidence and limits: docs/deployment-verification.md. This follow-up changes documentation only; preserve the same box and existing preview.
+
 ## 2026-11-12 — Dokploy deployment preparation
 
 Authorized deployment targets the existing Chaitanya project and resume-tex.buildwithkuro.tech. Added a nonroot Node 22/Bun image with trusted TeX provisioning, public-only build arguments, explicit runtime settings and persistent PDF cache. Compose retains Bubblewrap isolation without host capabilities or privileged mode. A server probe demonstrated nested namespaces need service-scoped seccomp/AppArmor options and systempaths=unconfined; the default masked proc mount failed. Actual image compilation and live verification remain pending. Production Infisical is empty, so this deployment uses the existing development service configuration. Existing unrelated services and the same devbox are preserved.
