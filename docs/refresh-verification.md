@@ -1,5 +1,15 @@
 # Real-service refresh verification
 
+## Post-rebase verification, 2026-11-12
+
+The dev branch now includes main `1906be0`. Conflicts in the environment example, logbook and TeX setup are resolved, retaining the real-service-only runtime and main's workstation, Convex and imported-resume fixes.
+
+Combined behavior candidate: `b8ec52a600bf42ccf3f082ac6872628454f92bc5`. Code digest: `c45a6e295a7da932bd1f65dd075c605e0cd8bd61bf248b6cb5eb3f4d93864ab8`. The `pr-main-sync` gate passed TeX setup, shell syntax, formatting, both typecheck projects, lint, build, 50 Bun tests/321 assertions, three Convex tests and all 12 real-service Chromium cases in 4.9 minutes. The separate sandbox import check compiled fullpage, Babel English and titlesec, then matched actual PDF text. External authenticated MCP remains intentionally skipped.
+
+`artifacts/pr-main-sync-complete.json` records the candidate and logs. `artifacts/pr-main-sync-evidence.json` hashes 52 screenshots and seven videos copied into the immutable `artifacts/pr-main-sync-captures/` snapshot, with nine empty diagnostic reports and test cleanup metadata. Two narrowly classified hard-navigation cancellations were recorded separately. The tests recovered one Convex read reset through the existing bounded read retry. No mutation was replayed.
+
+The earlier sections below describe the preceding reviewed run. The final PR preparation adds documentation only after this combined verification.
+
 The refresh uses real Clerk sessions, the deployed private Convex workspace, the configured compatible model, and the isolated TeX compiler. Runtime local stores, model mocks, browser draft recovery, fictional starter content and product mode switches are removed. Historical local documents and browser keys are preserved and are not migrated.
 
 ## Candidate and commands

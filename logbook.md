@@ -1,5 +1,9 @@
 # Logbook
 
+## 2026-11-12 — Rebased PR verified
+
+Combined candidate `b8ec52a600bf42ccf3f082ac6872628454f92bc5` passed trusted TeX setup, shell syntax, formatting, application/Convex typechecks, lint, build, 50 Bun tests/321 assertions, three Convex tests and 12 real-service Chromium cases in 4.9 minutes. An actual sandbox compile and PDF text extraction also passed with fullpage, Babel English and titlesec together. Nine diagnostic arrays are empty; two exact in-flight navigation cancellations remain separately recorded. Test users/documents were cleaned, test3100 stopped, and the existing box keeps the private preview. Marker and immutable captures are indexed in artifacts/pr-main-sync-evidence.json. The final documentation-only record does not change the tested digest.
+
 ## 2026-11-12 — Prepare dev-to-main PR
 
 Rebased dev onto main `1906be0` and resolved the three conflicts. Kept real-service-only environment examples, both branches' history, Babel English/fullpage provisioning, repeatable shell setup, the configurable Node PDF worker with its existing main-branch limit, and the separate Convex typecheck. Preserved the pre-rebase dev tip in a backup ref. Full verification follows on the combined tree before the authorized dev update and PR creation. No merge into main or deployment is authorized.
