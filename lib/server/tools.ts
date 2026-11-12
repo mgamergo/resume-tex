@@ -57,8 +57,10 @@ export type ToolCall = z.infer<typeof toolCallSchema>;
 export const toolDescriptions: Record<ToolCall["tool"], string> = {
   flatten_columns:
     "Remove supported minipage column wrappers while preserving their contents.",
-  read_document: "Read authoritative source, digest, revision and line ranges.",
-  range_patch: "Propose bounded exact source edits. Never applies them.",
+  read_document:
+    "Read authoritative source, digest, revision, edit policy and line ranges.",
+  range_patch:
+    "Submit bounded exact source edits under the owner's current edit policy.",
   insert_section: "Propose a section immediately before end document.",
   rewrite_bullet:
     "Propose one bullet rewrite preserving all established facts.",

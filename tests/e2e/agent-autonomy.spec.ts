@@ -77,7 +77,12 @@ test.beforeEach(async ({ page }) => {
 });
 test.afterEach(async ({ page }, info) => {
   try {
+    // Stop document polling before deleting this test's identity.
+    const report = reports.get(page);
+    if (report) report.leaving = new Set(report.inflight);
+    await page.goto("about:blank");
     await cleanup(page);
+    expect(report?.errors ?? []).toEqual([]);
   } finally {
     const report = reports.get(page);
     await writeFile(
@@ -205,7 +210,10 @@ test("agent autonomy persists and applies real model edits with history and undo
   const report = reports.get(page);
   if (report) report.leaving = new Set(report.inflight);
   await page.reload();
-  await page.getByRole("button", { name: /Jake's Resume/ }).click();
+  await page
+    .locator(".resume-card")
+    .filter({ hasText: "Jake's Resume resume" })
+    .click();
   await showAgent(page);
   await expect(page.getByLabel("Agent edits", { exact: true })).toHaveValue(
     "autonomous",
