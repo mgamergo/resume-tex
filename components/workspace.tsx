@@ -524,6 +524,18 @@ export function Workspace() {
   };
   const goHome = async () => {
     if (activeRef.current && !(await save(false))) return;
+    const baseline = activeRef.current;
+    if (
+      baseline &&
+      (conflictRef.current ||
+        draftRef.current.source !== baseline.source ||
+        draftRef.current.engine !== baseline.engine)
+    ) {
+      setNotice("Your latest edits are still saving. Try again when saved.");
+      return;
+    }
+    setApplying(false);
+    loadingDocument.current = false;
     compileSequence.current++;
     documentSession.current++;
     activeRef.current = null;

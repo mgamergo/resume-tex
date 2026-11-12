@@ -471,3 +471,57 @@ test("automatic apply preserves typing and pauses stale autosave until explicit 
     await page.unroute("**/api/agent");
   }
 });
+
+test("returning to resumes preserves typing entered during an awaited save", async ({
+  page,
+}) => {
+  const { id, editor } = await createResume(page);
+  const held = deferred();
+  const release = deferred();
+  let first = true;
+  await page.route("**/api/workspace", async (route) => {
+    if (
+      route.request().method() !== "POST" ||
+      route.request().postDataJSON()?.op !== "save" ||
+      !first
+    ) {
+      await route.continue();
+      return;
+    }
+    first = false;
+    const response = await route.fetch();
+    expect(response.status()).toBe(200);
+    held.release();
+    await release.promise;
+    await route.fulfill({ response });
+  });
+  try {
+    await editor.fill(templates[0].source.replace("Alex Morgan", "First Save"));
+    await page.getByLabel("Back to resumes", { exact: true }).click();
+    await held.promise;
+    await editor.fill(
+      templates[0].source.replace("Alex Morgan", "Retained Draft"),
+    );
+    release.release();
+    await expect(editor).toContainText("Retained Draft");
+    await expect(page.locator(".textLayer")).toContainText("Retained Draft");
+    await expect(page.locator(".save-status")).toContainText(
+      "All changes saved",
+    );
+    const response = await page.request.get(
+      `/api/workspace?id=${encodeURIComponent(id)}`,
+    );
+    expect(response.status()).toBe(200);
+    expect(resumeSchema.parse((await response.json()).resume).source).toBe(
+      templates[0].source.replace("Alex Morgan", "Retained Draft"),
+    );
+    await page.getByLabel("Back to resumes", { exact: true }).click();
+    await expect(
+      page.locator(".resume-card").filter({ hasText: "Jake's Resume resume" }),
+    ).toBeVisible();
+    await assertDiagnostics(page);
+  } finally {
+    release.release();
+    await page.unroute("**/api/workspace");
+  }
+});
