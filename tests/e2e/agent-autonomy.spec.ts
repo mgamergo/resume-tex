@@ -80,6 +80,7 @@ test.afterEach(async ({ page }, info) => {
     // Stop document polling before deleting this test's identity.
     const report = reports.get(page);
     if (report) report.leaving = new Set(report.inflight);
+    await page.waitForLoadState("networkidle");
     await page.goto("about:blank");
     await cleanup(page);
     expect(report?.errors ?? []).toEqual([]);
@@ -219,6 +220,7 @@ test("agent autonomy persists and applies real model edits with history and undo
     "autonomous",
   );
   if (report) report.leaving = null;
+  await expect(page.locator(".textLayer")).toContainText("Alex Morgan");
   for (const viewport of [
     { width: 1440, height: 900 },
     { width: 768, height: 1024 },
@@ -242,6 +244,8 @@ test("agent autonomy persists and applies real model edits with history and undo
           () => document.documentElement.scrollWidth <= window.innerWidth + 1,
         ),
       ).toBe(true);
+      if (viewport.width > 768)
+        await expect(page.locator(".textLayer")).toContainText("Alex Morgan");
       await page.screenshot({
         path: `artifacts/autonomy/${viewport.width}-${theme}-permission.png`,
         animations: "disabled",
@@ -448,6 +452,18 @@ test("automatic apply preserves typing and pauses stale autosave until explicit 
     await expect(editor).not.toContainText("Local Draft");
     await expect(page.locator(".draft-conflict")).toHaveCount(0);
     await expect(setting).toHaveValue("autonomous");
+    await expect(
+      page.getByRole("button", { name: "Compile", exact: true }),
+    ).toBeEnabled();
+    await expect
+      .poll(async () => {
+        const text = await page.locator(".textLayer").innerText();
+        return (
+          text.indexOf("Skills") >= 0 &&
+          text.indexOf("Skills") < text.indexOf("Experience")
+        );
+      })
+      .toBe(true);
     await assertDiagnostics(page);
   } finally {
     release.release();
