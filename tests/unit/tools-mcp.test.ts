@@ -67,12 +67,16 @@ test("a provider's old offsets cannot be rebound onto newer source", async () =>
     source: "% New prefix\n" + doc.source,
     engine: doc.engine,
   });
-  await expect(executeTool(store, doc.id, planned, doc.digest)).rejects.toThrow(
-    "Document changed",
-  );
+  await expect(
+    executeTool(store, {
+      kind: "edit",
+      resumeId: doc.id,
+      baseDigest: doc.digest,
+      action: { kind: "structured", call: planned, verifiedEvidence: "" },
+    }),
+  ).rejects.toThrow("Document changed");
   expect(await store.proposals(doc.id)).toEqual([]);
 });
-test.skip("external authenticated MCP e2e requires MCP_CLERK_TOKEN and MCP_RESUME_ID", () => {});
 test("supported column flattening preserves facts and compiles a one-column actual PDF", async () => {
   const { applyEdits } = await import("../../lib/core/model");
   const { compile, readArtifact } = await import("../../lib/server/compiler");
@@ -176,4 +180,48 @@ test("skill claims use token boundaries in both proposals and supporting evidenc
       ),
     ).not.toThrow();
   }
+});
+
+test("executeTool captures permission before planning and never upgrades an older request", async () => {
+  const store = new LocalStore("policy-planning");
+  const doc = await store.create({
+    name: "Policy",
+    source: sample.source,
+    engine: sample.engine,
+    template: sample.template,
+  });
+  await store.setAgentEditPolicy({
+    resumeId: doc.id,
+    mode: "autonomous",
+    expectedVersion: 0,
+  });
+  const result = await executeTool(store, {
+    kind: "edit",
+    resumeId: doc.id,
+    baseDigest: doc.digest,
+    action: {
+      kind: "planned",
+      resolve: async () => {
+        await store.setAgentEditPolicy({
+          resumeId: doc.id,
+          mode: "review",
+          expectedVersion: 1,
+        });
+        return {
+          tool: "range_patch",
+          title: "Comment",
+          edits: [
+            { start: 0, end: 0, expected: "", replacement: "% queued\n" },
+          ],
+        };
+      },
+    },
+  });
+  expect(result.kind).toBe("proposal");
+  expect((await store.get(doc.id)).revision).toBe(1);
+  const read = await executeTool(store, { kind: "read", resumeId: doc.id });
+  expect(read.kind).toBe("document");
+  if (read.kind !== "document") throw new Error("Read must not edit");
+  expect(read.policy).toEqual({ mode: "review", version: 2 });
+  expect(read.resume.source).toBe(doc.source);
 });

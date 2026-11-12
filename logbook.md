@@ -1,5 +1,25 @@
 # Logbook
 
+## 2026-11-12 — Autonomy PR opened
+
+Opened https://github.com/mgamergo/resume-tex/pull/2 from dev to main for per-resume autonomous agent editing. Dev includes the current main without conflicts. The PR records the separate baseline and correction checks and the two-round Sol approval. This commit updates project memory only. Repository remains private; the same box and preview are preserved.
+
+## 2026-11-12 — Autonomy Sol approval
+
+Sol round 2 approved clean `585f1e1`: both deletion findings resolved, no new findings. Two rounds used gpt-6.1-sol on high reasoning; usage was not returned. The tested behavior remains `aa8827b`, with baseline full 16-case and final focused correction evidence kept separate. This record changes documentation only. Push to dev follows; the same box and private preview remain running.
+
+## 2026-11-12 — Sol deletion corrections
+
+Sol round 1 found retained conflict state after deletion (S1, should) and a related retained apply lock (S2, nit). Four successful-deletion cleanup statements address both. Clean behavior `aa8827b` passed fresh formatting, types, lint, build, 55 Bun tests/337 assertions, 11 Convex tests and a real-service conflict/delete/create plus held-accept/delete/create regression. Baseline full 16-case results remain separate. Current diagnostics are empty and test resources cleaned. Ledger: docs/agent-autonomy-sol-review.md. Fresh scoped recheck follows before push.
+
+## 2026-11-12 — Autonomy verified
+
+Development functions deployed to the existing Convex deployment using the securely supplied matching dev key. Clean behavior head `4906819` passed formatting, application/Convex types, lint, build, 55 Bun tests/337 assertions, 11 Convex tests and 16 real-service Chromium cases, including actual stdio MCP. Fixed delayed navigation locks and typing during save; retained failed logs and narrowed a test fixture to exclude a measured box HEAD probe. Current diagnostics are empty, test identities are cleaned and the private preview remains running in the same box. Evidence: artifacts/autonomy-evidence.json. Sol review follows before push.
+
+## 2026-11-12 — Per-resume agent autonomy
+
+Selected architecture B: a separate owner-scoped permission record and one atomic proposal/application path shared by HTTP and MCP. Review remains default; policy-version checks prevent in-flight requests gaining authority after a setting change. Added a persistent Assistant control and source reconciliation that preserves dirty drafts. Types, lint, 55 Bun tests/337 assertions and 11 Convex tests pass. Live deployment/browser verification follows; the existing preview and same persisted box are preserved.
+
 ## 2026-11-12 — PR opened
 
 Opened https://github.com/mgamergo/resume-tex/pull/1 from dev to main. GitHub reports MERGEABLE/CLEAN with no conflicts. Preserved the old dev tip at backup/dev-before-main-rebase-20261112 and pushed the rebase with an exact lease. Repository remains private; main is unchanged. Verification and cleanup are recorded below. The existing box and private preview remain running.

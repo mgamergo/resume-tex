@@ -6,7 +6,7 @@ The same validated registry powers HTTP assistant actions and MCP.
 
 | Tool                | Result                                                                                                                                                             |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `read_document`     | Source, digest, revision and numbered lines.                                                                                                                       |
+| `read_document`     | Source, digest, revision, current edit policy and numbered lines.                                                                                                  |
 | `range_patch`       | Up to 30 exact changes, at most 4,000 characters per replaced span, 8,000 total changed characters, and under half the document. Whole-document replacements fail. |
 | `insert_section`    | Escaped user content before the document end.                                                                                                                      |
 | `rewrite_bullet`    | One line, at most 2,000 characters, with no structural document commands.                                                                                          |
@@ -14,7 +14,7 @@ The same validated registry powers HTTP assistant actions and MCP.
 | `fix_compile_error` | Missing document closure or a known misspelled command. Unsupported repairs fail with a source-review instruction.                                                 |
 | `tailor_to_job`     | Existing adjacent bullets reordered by job language. No new claims.                                                                                                |
 
-All edits are proposals. Accept/reject is a UI operation; accepted source is a new immutable revision. Undo proposal restores its previous revision as another new revision. Ordinary editor undo remains available for source edits. Numeric evidence not already in source and unsupported known skill names are rejected. User review is still needed for semantics, omitted context and non-numeric claims.
+Agent edits default to review. In the Assistant panel, each resume can allow automatic application for both the built-in assistant and external MCP agents. Valid automatic edits create accepted proposals and immutable revisions in one transaction. Review-mode edits remain pending for Accept or Reject. Undo proposal restores its previous revision as another new revision. Ordinary editor undo remains available for source edits. Numeric evidence not already in source and unsupported known skill names are rejected. User review is still needed for semantics, omitted context and non-numeric claims.
 
 ## Run stdio MCP
 
@@ -40,4 +40,8 @@ Protocol surface has `read_document {}` and `propose_edit {baseDigest,call}`. Th
 }
 ```
 
-No acceptance, shell, arbitrary file or generic network tool is exposed. The UI polls proposals every 12 seconds. Requests use size/rate/origin checks; ownership is validated independently in Convex. Unit tests cover structured tools and approval; external MCP end-to-end verification requires separately issued credentials.
+No permission-setting, acceptance, shell, arbitrary file or generic network tool is exposed. The UI polls the source, permission, history and proposals every 12 seconds. Clean editors adopt external changes; dirty drafts are preserved and autosave pauses until the owner explicitly loads the saved source. Requests use size/rate/origin checks; ownership is validated independently in Convex. Unit and Convex tests cover structured edits, permission changes and atomic application. The connected browser suite includes an actual stdio MCP client with a short-lived test-owned Clerk JWT.
+
+`propose_edit` retains its inputs. Its result is either `{kind: "proposal", proposal}` for pending review, or `{kind: "applied", proposal, resume}` after an automatic commit. Read the latest document before preparing another edit. Permission is captured before planning; a change during that request leaves the edit pending. Source conflicts still fail. Existing pending proposals are never accepted merely by enabling autonomy.
+
+See [Agent autonomy](agent-autonomy.md) for the transaction and draft rules.

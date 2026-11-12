@@ -56,3 +56,5 @@ bun run test:e2e
 ```
 
 Unit fixtures and SQLite test doubles live exclusively under `tests/`. Template and compiler tests use the actual sandbox and PDF extraction. Convex emulator tests verify identity and atomic transitions. Browser tests use disposable, marked Clerk users, their private Convex documents, and the configured real model. They run one headless Chromium worker, attach diagnostics before navigation, disable credential-bearing traces, and clean up only test-owned records. External authenticated MCP e2e requires separately supplied MCP credentials.
+
+Agent edits default to review. Choose **Apply automatically** in a resume's Assistant panel to authorize the built-in assistant and external MCP agents for that resume. Automatic changes retain history and Undo. See [agent autonomy](docs/agent-autonomy.md).

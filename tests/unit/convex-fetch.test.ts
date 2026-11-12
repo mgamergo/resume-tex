@@ -6,11 +6,16 @@ import {
 import { convexOperation } from "../../lib/server/convex-errors";
 test("Convex deadlines start per fetch, include the body, preserve caller aborts and never replay", async () => {
   let calls = 0;
+  const observed: { method: string; path: string }[] = [];
   let arrived: () => void = () => {};
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
     fetch(request) {
+      const path = new URL(request.url).pathname;
+      observed.push({ method: request.method, path });
+      if (request.method !== "POST" || (path !== "/fast" && path !== "/stall"))
+        return new Response("Not a fixture request", { status: 404 });
       calls++;
       arrived();
       if (new URL(request.url).pathname === "/fast")
@@ -27,12 +32,14 @@ test("Convex deadlines start per fetch, include the body, preserve caller aborts
   });
   try {
     const base = `http://127.0.0.1:${server.port}`;
+    expect((await fetch(base + "/", { method: "HEAD" })).status).toBe(404);
+    expect(calls).toBe(0);
     const bounded = createConvexFetch({ deadlineMs: 100 });
     await Bun.sleep(120);
     expect(
       await (await bounded(base + "/fast", { method: "POST" })).json(),
     ).toEqual({ ok: true });
-    expect(calls).toBe(1);
+    expect(calls, JSON.stringify(observed)).toBe(1);
     await expect(
       createConvexFetch({ deadlineMs: 50 })(base + "/stall", {
         method: "POST",

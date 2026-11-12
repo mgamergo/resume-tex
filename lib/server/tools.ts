@@ -57,8 +57,10 @@ export type ToolCall = z.infer<typeof toolCallSchema>;
 export const toolDescriptions: Record<ToolCall["tool"], string> = {
   flatten_columns:
     "Remove supported minipage column wrappers while preserving their contents.",
-  read_document: "Read authoritative source, digest, revision and line ranges.",
-  range_patch: "Propose bounded exact source edits. Never applies them.",
+  read_document:
+    "Read authoritative source, digest, revision, edit policy and line ranges.",
+  range_patch:
+    "Submit bounded exact source edits under the owner's current edit policy.",
   insert_section: "Propose a section immediately before end document.",
   rewrite_bullet:
     "Propose one bullet rewrite preserving all established facts.",
@@ -403,35 +405,48 @@ export function buildProposal(
     verifiedEvidence,
   );
 }
-export async function executeTool(
-  store: Store,
-  resumeId: string,
-  call: ToolCall,
-  baseDigest?: string,
-  verifiedEvidence = "",
-) {
-  const resume = await store.get(resumeId);
-  if (
-    call.tool !== "read_document" &&
-    (!baseDigest || resume.digest !== baseDigest)
-  )
+type ToolExecution =
+  | { kind: "read"; resumeId: string }
+  | {
+      kind: "edit";
+      resumeId: string;
+      baseDigest: string;
+      action:
+        | { kind: "structured"; call: ToolCall; verifiedEvidence: string }
+        | { kind: "planned"; resolve: (resume: Resume) => Promise<ToolCall> };
+    };
+export async function executeTool(store: Store, command: ToolExecution) {
+  const { resume, policy } = await store.readEditContext(command.resumeId);
+  if (command.kind === "edit" && resume.digest !== command.baseDigest)
     throw new DomainError(
       "Document changed while the edit was being prepared. Request a fresh proposal.",
       409,
     );
+  const call =
+    command.kind === "read"
+      ? ({ tool: "read_document" } satisfies ToolCall)
+      : command.action.kind === "planned"
+        ? await command.action.resolve(resume)
+        : command.action.call;
   if (call.tool === "read_document")
     return {
       kind: "document" as const,
       resume,
+      policy,
       lines: resume.source
         .split("\n")
         .map((text, index) => ({ line: index + 1, text })),
     };
-  return {
-    kind: "proposal" as const,
-    proposal: await store.propose(
-      resumeId,
-      buildProposal(resume, call, verifiedEvidence),
+  return store.propose({
+    resumeId: resume.id,
+    input: buildProposal(
+      resume,
+      call,
+      command.kind === "edit" && command.action.kind === "structured"
+        ? command.action.verifiedEvidence
+        : "",
     ),
-  };
+    expectedRevision: resume.revision,
+    policyVersion: policy.version,
+  });
 }

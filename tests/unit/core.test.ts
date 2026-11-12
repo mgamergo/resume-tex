@@ -56,29 +56,33 @@ describe("authoritative source and immutable history", () => {
     await expect(store.save({ ...input, name: "Lost update" })).rejects.toThrow(
       "newer revision",
     );
-    const proposal = await store.propose(
-      doc.id,
-      buildProposal(renamed, {
+    const { proposal } = await store.propose({
+      resumeId: doc.id,
+      expectedRevision: renamed.revision,
+      policyVersion: 0,
+      input: buildProposal(renamed, {
         tool: "rewrite_bullet",
         start: renamed.source.indexOf("Built a"),
         end: renamed.source.indexOf("Built a") + 5,
         replacement: "Built one",
       }),
-    );
+    });
     expect((await store.get(doc.id)).source).toBe(doc.source);
     await expect(other.decide(doc.id, proposal.id, true)).rejects.toThrow();
     const accepted = await store.decide(doc.id, proposal.id, true);
     expect(accepted.source).toContain("Built one");
     expect((await store.history(doc.id)).length).toBe(3);
     await expect(store.decide(doc.id, proposal.id, true)).rejects.toThrow();
-    const stale = await store.propose(
-      doc.id,
-      buildProposal(accepted, {
+    const { proposal: stale } = await store.propose({
+      resumeId: doc.id,
+      expectedRevision: accepted.revision,
+      policyVersion: 0,
+      input: buildProposal(accepted, {
         tool: "range_patch",
         title: "tiny edit",
         edits: [{ start: 0, end: 0, expected: "", replacement: "% draft\n" }],
       }),
-    );
+    });
     const newer = await store.save({
       id: doc.id,
       baseDigest: accepted.digest,
