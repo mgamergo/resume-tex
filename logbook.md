@@ -1,5 +1,9 @@
 # Logbook
 
+## 2026-11-12 — Prepare dev-to-main PR
+
+Rebased dev onto main `1906be0` and resolved the three conflicts. Kept real-service-only environment examples, both branches' history, Babel English/fullpage provisioning, repeatable shell setup, the configurable Node PDF worker with its existing main-branch limit, and the separate Convex typecheck. Preserved the pre-rebase dev tip in a backup ref. Full verification follows on the combined tree before the authorized dev update and PR creation. No merge into main or deployment is authorized.
+
 ## 2026-11-11 — Refresh Sol approval
 
 The second UI/UX Sol round approved clean `f63eabf`: S1 and S2 resolved, Escape handling accepted, no new findings. The reviewer verified all eight correction screenshots against the evidence manifest and read the passing logs; it ran no suites or browsers. Two rounds used gpt-6.1-sol on high reasoning; usage was not returned. The tested behavior remains `cb6860c` with the recorded digest. This final change records approval only. The same box and private port-3000 preview remain in use; external MCP is intentionally unverified.
