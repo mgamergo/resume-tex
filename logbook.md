@@ -1,5 +1,9 @@
 # Logbook
 
+## 2026-11-12 — Sol deletion corrections
+
+Sol round 1 found retained conflict state after deletion (S1, should) and a related retained apply lock (S2, nit). Four successful-deletion cleanup statements address both. Clean behavior `aa8827b` passed fresh formatting, types, lint, build, 55 Bun tests/337 assertions, 11 Convex tests and a real-service conflict/delete/create plus held-accept/delete/create regression. Baseline full 16-case results remain separate. Current diagnostics are empty and test resources cleaned. Ledger: docs/agent-autonomy-sol-review.md. Fresh scoped recheck follows before push.
+
 ## 2026-11-12 — Autonomy verified
 
 Development functions deployed to the existing Convex deployment using the securely supplied matching dev key. Clean behavior head `4906819` passed formatting, application/Convex types, lint, build, 55 Bun tests/337 assertions, 11 Convex tests and 16 real-service Chromium cases, including actual stdio MCP. Fixed delayed navigation locks and typing during save; retained failed logs and narrowed a test fixture to exclude a measured box HEAD probe. Current diagnostics are empty, test identities are cleaned and the private preview remains running in the same box. Evidence: artifacts/autonomy-evidence.json. Sol review follows before push.
