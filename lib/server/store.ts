@@ -6,12 +6,23 @@ import { makeFunctionReference } from "convex/server";
 import type {
   Engine,
   Proposal,
-  ProposalInput,
   Resume,
   ResumeSummary,
   Revision,
   RevisionSummary,
 } from "../core/model";
+import {
+  editContextSchema,
+  workspaceDetailsSchema,
+  submissionResultSchema,
+  agentEditPolicySchema,
+  type AgentEditPolicy,
+  type EditContext,
+  type WorkspaceDetails,
+  type SubmitProposal,
+  type SubmissionResult,
+  type SetAgentEditPolicy,
+} from "../core/agent-policy";
 export interface Store {
   list(): Promise<ResumeSummary[]>;
   get(id: string): Promise<Resume>;
@@ -25,7 +36,10 @@ export interface Store {
   remove(id: string): Promise<void>;
   history(id: string): Promise<RevisionSummary[]>;
   revision(id: string, revision: number): Promise<Revision>;
-  propose(id: string, input: ProposalInput): Promise<Proposal>;
+  readEditContext(id: string): Promise<EditContext>;
+  details(id: string): Promise<WorkspaceDetails>;
+  propose(command: SubmitProposal): Promise<SubmissionResult>;
+  setAgentEditPolicy(command: SetAgentEditPolicy): Promise<AgentEditPolicy>;
   proposals(id: string): Promise<Proposal[]>;
   decide(id: string, proposalId: string, accept: boolean): Promise<Resume>;
 }
@@ -68,7 +82,22 @@ export function getStore(token: string): Store {
     save: (input) => mutate<Resume>("save", input),
     remove: (id) => mutate<void>("remove", { id }),
     history: (id) => query<RevisionSummary[]>("history", { id }),
-    propose: (id, input) => mutate<Proposal>("propose", { id, input }),
+    readEditContext: (id) =>
+      query<unknown>("edit_context", { id }).then((value) =>
+        editContextSchema.parse(value),
+      ),
+    details: (id) =>
+      query<unknown>("details", { id }).then((value) =>
+        workspaceDetailsSchema.parse(value),
+      ),
+    propose: (command) =>
+      mutate<unknown>("propose", command).then((value) =>
+        submissionResultSchema.parse(value),
+      ),
+    setAgentEditPolicy: (command) =>
+      mutate<unknown>("agent_policy", command).then((value) =>
+        agentEditPolicySchema.parse(value),
+      ),
     revision: (id, revision) => query<Revision>("revision", { id, revision }),
     proposals: (id) => query<Proposal[]>("proposals", { id }),
     decide: (id, proposalId, accept) =>

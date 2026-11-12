@@ -403,35 +403,48 @@ export function buildProposal(
     verifiedEvidence,
   );
 }
-export async function executeTool(
-  store: Store,
-  resumeId: string,
-  call: ToolCall,
-  baseDigest?: string,
-  verifiedEvidence = "",
-) {
-  const resume = await store.get(resumeId);
-  if (
-    call.tool !== "read_document" &&
-    (!baseDigest || resume.digest !== baseDigest)
-  )
+type ToolExecution =
+  | { kind: "read"; resumeId: string }
+  | {
+      kind: "edit";
+      resumeId: string;
+      baseDigest: string;
+      action:
+        | { kind: "structured"; call: ToolCall; verifiedEvidence: string }
+        | { kind: "planned"; resolve: (resume: Resume) => Promise<ToolCall> };
+    };
+export async function executeTool(store: Store, command: ToolExecution) {
+  const { resume, policy } = await store.readEditContext(command.resumeId);
+  if (command.kind === "edit" && resume.digest !== command.baseDigest)
     throw new DomainError(
       "Document changed while the edit was being prepared. Request a fresh proposal.",
       409,
     );
+  const call =
+    command.kind === "read"
+      ? ({ tool: "read_document" } satisfies ToolCall)
+      : command.action.kind === "planned"
+        ? await command.action.resolve(resume)
+        : command.action.call;
   if (call.tool === "read_document")
     return {
       kind: "document" as const,
       resume,
+      policy,
       lines: resume.source
         .split("\n")
         .map((text, index) => ({ line: index + 1, text })),
     };
-  return {
-    kind: "proposal" as const,
-    proposal: await store.propose(
-      resumeId,
-      buildProposal(resume, call, verifiedEvidence),
+  return store.propose({
+    resumeId: resume.id,
+    input: buildProposal(
+      resume,
+      call,
+      command.kind === "edit" && command.action.kind === "structured"
+        ? command.action.verifiedEvidence
+        : "",
     ),
-  };
+    expectedRevision: resume.revision,
+    policyVersion: policy.version,
+  });
 }

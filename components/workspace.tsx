@@ -57,8 +57,6 @@ import { templates } from "@/lib/core/templates";
 import {
   resumeSchema,
   resumeSummarySchema,
-  revisionSummarySchema,
-  proposalSchema,
   compileSchema,
   atsSchema,
 } from "@/lib/core/schemas";
@@ -72,20 +70,24 @@ import type {
 import type { CompileResult } from "@/lib/server/compiler";
 import type { AtsReport } from "@/lib/core/ats";
 import type { ToolCall } from "@/lib/server/tools";
+import {
+  agentEditModeSchema,
+  agentEditPolicySchema,
+  submissionResultSchema,
+  workspaceDetailsSchema,
+  type AgentEditPolicy,
+} from "@/lib/core/agent-policy";
+import { classifyResumeHead } from "@/lib/client/resume-head";
+type DraftConflict =
+  { kind: "changed"; resume: Resume } | { kind: "unconfirmed" };
 const documentResponse = z.object({ resume: resumeSchema });
-const detailResponse = documentResponse.extend({
-  history: z.array(revisionSummarySchema),
-  proposals: z.array(proposalSchema),
-});
-const assistantResponse = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("proposal"),
-    proposal: proposalSchema,
-    provider: z.string(),
-  }),
+const detailResponse = workspaceDetailsSchema;
+const assistantResponse = z.union([
+  submissionResultSchema.and(z.object({ provider: z.string() })),
   z.object({
     kind: z.literal("document"),
     resume: resumeSchema,
+    policy: agentEditPolicySchema,
     provider: z.string(),
   }),
 ]);
@@ -134,6 +136,23 @@ export function Workspace() {
   const [creating, setCreating] = useState("");
   const [history, setHistory] = useState<RevisionSummary[]>([]);
   const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [agentPolicy, setAgentPolicy] = useState<AgentEditPolicy>({
+    mode: "review",
+    version: 0,
+  });
+  const policyRef = useRef(agentPolicy);
+  const [policySaving, setPolicySaving] = useState(false);
+  const policyRequest = useRef<{ id: string; session: number } | null>(null);
+  const deferredHead = useRef<Resume | null>(null);
+  const [draftConflict, setDraftConflict] = useState<DraftConflict | null>(
+    null,
+  );
+  const conflictRef = useRef<DraftConflict | null>(null);
+  const loadingDocument = useRef(false);
+  const setConflict = useCallback((conflict: DraftConflict | null) => {
+    conflictRef.current = conflict;
+    setDraftConflict(conflict);
+  }, []);
   const [compileResult, setCompileResult] = useState<CompileResult | null>(
     null,
   );
@@ -189,7 +208,6 @@ export function Workspace() {
   const savePromise = useRef<Promise<Resume | null> | null>(null);
   const compileSequence = useRef(0);
   const workspace = useRef<HTMLDivElement>(null);
-  const sourceRef = useRef(source);
   const pending = proposals.filter((proposal) => proposal.status === "pending");
   const dirty =
     !!active && (source !== active.source || engine !== active.engine);
@@ -198,13 +216,6 @@ export function Workspace() {
     (artifact.digest !== active?.digest || dirty || artifact.engine !== engine);
   const isCurrent = (id: string, session: number) =>
     activeRef.current?.id === id && documentSession.current === session;
-  useEffect(() => {
-    activeRef.current = active;
-  }, [active]);
-  useEffect(() => {
-    draftRef.current = { source, engine };
-    sourceRef.current = source;
-  }, [source, engine]);
   const report = useCallback((reason: unknown) => {
     setError(reason instanceof Error ? reason.message : "Operation failed");
   }, []);
@@ -225,6 +236,14 @@ export function Workspace() {
       setLoading(false);
     }
   }, [report]);
+  useEffect(
+    () => () => {
+      documentSession.current += 1;
+      compileSequence.current += 1;
+      activeRef.current = null;
+    },
+    [],
+  );
   useEffect(() => {
     queueMicrotask(() => void refresh());
   }, [refresh]);
@@ -238,27 +257,23 @@ export function Workspace() {
     window.addEventListener("beforeunload", unload);
     return () => window.removeEventListener("beforeunload", unload);
   }, [dirty]);
-  const reloadDetails = useCallback(async (id: string) => {
-    const session = documentSession.current;
-    const detail = await api(
-      `/api/workspace?id=${encodeURIComponent(id)}`,
-      detailResponse,
-    );
-    if (session === documentSession.current && activeRef.current?.id === id) {
-      setHistory(detail.history);
-      setProposals((current) => reconcileProposals(current, detail.proposals));
-    }
-    return detail;
-  }, []);
   const compileDocument = useCallback(
     async (doc: Resume) => {
       const sequence = ++compileSequence.current;
+      const session = documentSession.current;
       setBusy(true);
       try {
         const result = await api("/api/compile", compileSchema, { id: doc.id });
         if (
           sequence !== compileSequence.current ||
-          activeRef.current?.id !== doc.id
+          session !== documentSession.current ||
+          activeRef.current?.id !== doc.id ||
+          activeRef.current.revision !== doc.revision ||
+          activeRef.current.digest !== doc.digest ||
+          activeRef.current.engine !== doc.engine ||
+          result.revision !== doc.revision ||
+          result.digest !== doc.digest ||
+          result.engine !== doc.engine
         )
           return;
         setCompileResult(result);
@@ -282,14 +297,93 @@ export function Workspace() {
     },
     [report],
   );
+  const reconcileHead = useCallback(
+    (incoming: Resume | null) => {
+      const baseline = activeRef.current;
+      if (!baseline || !incoming || incoming.id !== baseline.id) return;
+      if (
+        deferredHead.current &&
+        deferredHead.current.revision > incoming.revision
+      )
+        return;
+      const outcome = classifyResumeHead({
+        baseline,
+        draft: draftRef.current,
+        incoming,
+        busy: !!savePromise.current || applyingRef.current,
+      });
+      if (outcome === "ignore") {
+        if (
+          deferredHead.current &&
+          deferredHead.current.revision <= baseline.revision
+        )
+          deferredHead.current = null;
+        return;
+      }
+      deferredHead.current = incoming;
+      if (outcome === "defer") return;
+      if (outcome === "conflict") {
+        setConflict({ kind: "changed", resume: incoming });
+        setSaveState("error");
+        return;
+      }
+      deferredHead.current = null;
+      setConflict(null);
+      activeRef.current = incoming;
+      setActive(incoming);
+      if (outcome === "metadata") return;
+      draftRef.current = { source: incoming.source, engine: incoming.engine };
+      setSource(incoming.source);
+      setEngine(incoming.engine);
+      setSaveState("saved");
+      setAts(null);
+      setCompileResult(null);
+      setError("");
+      setNotice("Saved changes synced.");
+      void compileDocument(incoming);
+    },
+    [compileDocument, setConflict],
+  );
+  const reloadDetails = useCallback(
+    async (id: string) => {
+      const session = documentSession.current;
+      const detail = await api(
+        `/api/workspace?id=${encodeURIComponent(id)}`,
+        detailResponse,
+      );
+      if (session === documentSession.current && activeRef.current?.id === id) {
+        if (detail.policy.version >= policyRef.current.version) {
+          policyRef.current = detail.policy;
+          setAgentPolicy(detail.policy);
+        }
+        if (
+          detail.resume.revision >=
+          Math.max(
+            activeRef.current.revision,
+            deferredHead.current?.revision ?? 0,
+          )
+        )
+          setHistory(detail.history);
+        setProposals((current) =>
+          reconcileProposals(current, detail.proposals),
+        );
+        reconcileHead(detail.resume);
+      }
+      return detail;
+    },
+    [reconcileHead],
+  );
   const save = useCallback(
     async (forceCompile = true): Promise<Resume | null> => {
+      if (conflictRef.current) return null;
       if (savePromise.current) {
         await savePromise.current;
       }
+      if (conflictRef.current) return null;
       const doc = activeRef.current;
       if (!doc) return null;
       const draft = { ...draftRef.current };
+      const session = documentSession.current;
       if (draft.source === doc.source && draft.engine === doc.engine) {
         if (forceCompile) await compileDocument(doc);
         return doc;
@@ -305,7 +399,13 @@ export function Workspace() {
             source: draft.source,
             engine: draft.engine,
           });
-          if (activeRef.current?.id !== doc.id) return result.resume;
+          if (
+            activeRef.current?.id !== doc.id ||
+            documentSession.current !== session
+          )
+            return null;
+          if (activeRef.current.revision > result.resume.revision)
+            return activeRef.current;
           activeRef.current = result.resume;
           setActive(result.resume);
           setSaveState(
@@ -318,8 +418,19 @@ export function Workspace() {
           if (forceCompile) await compileDocument(result.resume);
           return result.resume;
         } catch (reason) {
-          setSaveState("error");
-          report(reason);
+          if (
+            activeRef.current?.id === doc.id &&
+            documentSession.current === session
+          ) {
+            setSaveState("error");
+            setConflict({ kind: "unconfirmed" });
+            report(reason);
+            try {
+              await reloadDetails(doc.id);
+            } catch (refreshError) {
+              report(refreshError);
+            }
+          }
           return null;
         }
       })();
@@ -328,33 +439,49 @@ export function Workspace() {
         return await action;
       } finally {
         savePromise.current = null;
+        if (documentSession.current === session)
+          reconcileHead(deferredHead.current);
       }
     },
-    [compileDocument, reloadDetails, report],
+    [compileDocument, reloadDetails, report, reconcileHead, setConflict],
   );
   const saveLatest = useRef(save);
   useEffect(() => {
     saveLatest.current = save;
   }, [save]);
   useEffect(() => {
-    if (!active || !dirty || applying) return;
+    if (!active || !dirty || applying || draftConflict) return;
     const timer = setTimeout(() => {
       void saveLatest.current(true);
     }, 1100);
     return () => clearTimeout(timer);
-  }, [source, engine, active, dirty, applying]);
+  }, [source, engine, active, dirty, applying, draftConflict]);
   const loadDocument = useCallback(
-    async (id: string) => {
-      if (activeRef.current && !(await saveLatest.current(false))) return;
-      const session = ++documentSession.current;
+    async (id: string, draftAction: "save" | "discard" = "save") => {
+      if (applyingRef.current) return;
+      let session = documentSession.current;
+      setApplying(true);
+      loadingDocument.current = true;
       try {
+        if (
+          draftAction === "save" &&
+          activeRef.current &&
+          !(await saveLatest.current(false))
+        )
+          return;
+        session = ++documentSession.current;
         const detail = await reloadDetails(id);
         if (session !== documentSession.current) return;
         const doc = detail.resume;
+        policyRef.current = detail.policy;
+        setAgentPolicy(detail.policy);
+        policyRequest.current = null;
+        setPolicySaving(false);
+        deferredHead.current = null;
+        setConflict(null);
         setHistory(detail.history);
         setProposals(detail.proposals);
         setAgentBusy(false);
-        setApplying(false);
         setAtsBusy(false);
         setAgentMessage("");
         activeRef.current = doc;
@@ -371,10 +498,23 @@ export function Workspace() {
         setMobileView("source");
         void compileDocument(doc);
       } catch (reason) {
-        report(reason);
+        if (session === documentSession.current) report(reason);
+      } finally {
+        if (session === documentSession.current) {
+          loadingDocument.current = false;
+          setApplying(false);
+          reconcileHead(deferredHead.current);
+        }
       }
     },
-    [compileDocument, reloadDetails, report, setApplying],
+    [
+      compileDocument,
+      reloadDetails,
+      report,
+      setApplying,
+      reconcileHead,
+      setConflict,
+    ],
   );
   const changeSource = (value: string) => {
     if (applyingRef.current) return;
@@ -394,6 +534,7 @@ export function Workspace() {
     await refresh();
   };
   const create = async (templateId: string) => {
+    if (conflictRef.current) return;
     setCreating(templateId);
     try {
       const template = templates.find((t) => t.id === templateId);
@@ -426,8 +567,7 @@ export function Workspace() {
         name,
       });
       if (!isCurrent(doc.id, session)) return;
-      activeRef.current = result.resume;
-      setActive(result.resume);
+      reconcileHead(result.resume);
       setModal(null);
       await refresh();
     } catch (reason) {
@@ -487,7 +627,49 @@ export function Workspace() {
     } catch (reason) {
       if (session === documentSession.current) report(reason);
     } finally {
-      if (session === documentSession.current) setApplying(false);
+      if (session === documentSession.current) {
+        setApplying(false);
+        reconcileHead(deferredHead.current);
+      }
+    }
+  };
+  const changeAgentPolicy = async (mode: AgentEditPolicy["mode"]) => {
+    const id = activeRef.current?.id;
+    if (!id || policyRequest.current || mode === policyRef.current.mode) return;
+    const request = { id, session: documentSession.current };
+    policyRequest.current = request;
+    setPolicySaving(true);
+    try {
+      const result = await api(
+        "/api/workspace",
+        z.object({ policy: agentEditPolicySchema }),
+        {
+          op: "agent_policy",
+          resumeId: id,
+          mode,
+          expectedVersion: policyRef.current.version,
+        },
+      );
+      if (!isCurrent(id, request.session)) return;
+      if (result.policy.version >= policyRef.current.version) {
+        policyRef.current = result.policy;
+        setAgentPolicy(result.policy);
+      }
+      await reloadDetails(id);
+    } catch (reason) {
+      if (isCurrent(id, request.session)) {
+        report(reason);
+        try {
+          await reloadDetails(id);
+        } catch (refreshError) {
+          report(refreshError);
+        }
+      }
+    } finally {
+      if (policyRequest.current === request) {
+        policyRequest.current = null;
+        setPolicySaving(false);
+      }
     }
   };
   const askAgent = async (
@@ -515,14 +697,24 @@ export function Workspace() {
         verifiedEvidence,
       });
       if (!isCurrent(doc.id, session)) return;
-      if (result.kind === "proposal") {
+      if (result.kind === "proposal" || result.kind === "applied") {
         setProposals((current) =>
           reconcileProposals(current, [result.proposal]),
         );
-      } else
+        if (result.kind === "applied") {
+          reconcileHead(result.resume);
+          setAgentMessage(`Applied: ${result.proposal.title}`);
+          await reloadDetails(doc.id);
+        }
+      } else {
+        if (result.policy.version >= policyRef.current.version) {
+          policyRef.current = result.policy;
+          setAgentPolicy(result.policy);
+        }
         setAgentMessage(
           `Read revision ${result.resume.revision}. Source has ${result.resume.source.split("\n").length} lines. Add factual evidence in the editor, then request a targeted change.`,
         );
+      }
     } catch (reason) {
       if (isCurrent(doc.id, session)) report(reason);
     } finally {
@@ -567,7 +759,10 @@ export function Workspace() {
     } catch (reason) {
       if (session === documentSession.current) report(reason);
     } finally {
-      if (session === documentSession.current) setApplying(false);
+      if (session === documentSession.current) {
+        setApplying(false);
+        reconcileHead(deferredHead.current);
+      }
     }
   };
   const runAts = async () => {
@@ -718,25 +913,27 @@ export function Workspace() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [setModal]);
+  const activeId = active?.id;
   useEffect(() => {
-    if (!active) return;
-    const id = active.id;
-    const session = documentSession.current;
+    if (!activeId) return;
+    let disposed = false;
+    let pending = false;
     const interval = setInterval(() => {
-      void api(`/api/workspace?id=${encodeURIComponent(id)}`, detailResponse)
-        .then((detail) => {
-          if (
-            activeRef.current?.id === id &&
-            session === documentSession.current
-          )
-            setProposals((current) =>
-              reconcileProposals(current, detail.proposals),
-            );
+      if (pending || loadingDocument.current) return;
+      pending = true;
+      void reloadDetails(activeId)
+        .catch((reason) => {
+          if (!disposed && activeRef.current?.id === activeId) report(reason);
         })
-        .catch(() => {});
+        .finally(() => {
+          pending = false;
+        });
     }, 12_000);
-    return () => clearInterval(interval);
-  }, [active]);
+    return () => {
+      disposed = true;
+      clearInterval(interval);
+    };
+  }, [activeId, reloadDetails, report]);
   const resize = (event: React.PointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     const element = workspace.current;
@@ -944,6 +1141,26 @@ export function Workspace() {
                   </button>
                 </div>
               )}
+              {draftConflict && (
+                <div className="draft-conflict" role="alert">
+                  <p>
+                    {draftConflict.kind === "changed"
+                      ? "Saved resume changed. Your draft is preserved."
+                      : "Save could not be confirmed. Your draft is preserved."}
+                  </p>
+                  <Button variant="outline" size="sm" onClick={downloadSource}>
+                    Download draft
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={applying || saveState === "saving"}
+                    onClick={() => void loadDocument(active.id, "discard")}
+                  >
+                    Discard draft and load saved
+                  </Button>
+                </div>
+              )}
               <div
                 className={`editor-body panel-${panel ?? "closed"} mobile-${mobileView}`}
               >
@@ -1067,7 +1284,7 @@ export function Workspace() {
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={applying || agentBusy}
+                            disabled={applying || agentBusy || !!draftConflict}
                             onClick={() =>
                               void askAgent({
                                 tool: "fix_compile_error",
@@ -1215,11 +1432,39 @@ export function Workspace() {
                           <Sparkles size={21} />
                         </span>
                         <h2>Assistant</h2>
-                        <p>Ask for a change, then review the diff.</p>
+                        <p>
+                          {agentPolicy.mode === "autonomous"
+                            ? "Agent edits apply automatically."
+                            : "Ask for a change, then review the diff."}
+                        </p>
+                      </div>
+                      <div className="agent-policy-setting">
+                        <label htmlFor="agent-edit-mode">Agent edits</label>
+                        <select
+                          id="agent-edit-mode"
+                          value={agentPolicy.mode}
+                          disabled={policySaving || applying}
+                          onChange={(event) =>
+                            void changeAgentPolicy(
+                              agentEditModeSchema.parse(event.target.value),
+                            )
+                          }
+                        >
+                          <option value="review">Review each edit</option>
+                          <option value="autonomous">
+                            Apply automatically
+                          </option>
+                        </select>
+                        <small>
+                          For this resume, including connected MCP agents.
+                        </small>
+                        {policySaving && (
+                          <span role="status">Saving permission…</span>
+                        )}
                       </div>
                       <div className="suggestion-grid">
                         <button
-                          disabled={applying || agentBusy}
+                          disabled={applying || agentBusy || !!draftConflict}
                           onClick={() => {
                             setInstruction(
                               "Tighten one bullet while preserving facts",
@@ -1234,7 +1479,7 @@ export function Workspace() {
                           <ChevronRight size={13} />
                         </button>
                         <button
-                          disabled={applying || agentBusy}
+                          disabled={applying || agentBusy || !!draftConflict}
                           onClick={() => {
                             const sections = [
                               ...source.matchAll(/\\section\*?\{([^}]+)\}/g),
@@ -1258,7 +1503,12 @@ export function Workspace() {
                           <ChevronRight size={13} />
                         </button>
                         <button
-                          disabled={applying || agentBusy || !job.trim()}
+                          disabled={
+                            applying ||
+                            agentBusy ||
+                            !!draftConflict ||
+                            !job.trim()
+                          }
                           onClick={() =>
                             void askAgent({
                               tool: "tailor_to_job",
@@ -1330,6 +1580,7 @@ export function Workspace() {
                                 size="sm"
                                 disabled={
                                   applying ||
+                                  !!draftConflict ||
                                   proposal.baseDigest !== active.digest ||
                                   dirty ||
                                   proposal.evidenceNeeded.length > 0
@@ -1351,24 +1602,25 @@ export function Workspace() {
                           </article>
                         ))
                       )}
-                      {history[0]?.note.startsWith("Accepted:") && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="undo-proposal"
-                          disabled={applying}
-                          onClick={() => {
-                            const index = history.findIndex((item) =>
-                              item.note.startsWith("Accepted:"),
-                            );
-                            const previous = history[index + 1];
-                            if (previous) void restore(previous.revision);
-                          }}
-                        >
-                          <Undo2 size={14} />
-                          Undo proposal
-                        </Button>
-                      )}
+                      {history[0]?.revision === active.revision &&
+                        history[0]?.note.startsWith("Accepted:") && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="undo-proposal"
+                            disabled={applying || !!draftConflict || dirty}
+                            onClick={() => {
+                              const index = history.findIndex((item) =>
+                                item.note.startsWith("Accepted:"),
+                              );
+                              const previous = history[index + 1];
+                              if (previous) void restore(previous.revision);
+                            }}
+                          >
+                            <Undo2 size={14} />
+                            Undo proposal
+                          </Button>
+                        )}
                       <div className="agent-composer">
                         <label htmlFor="agent-instruction">
                           Ask for a targeted change
@@ -1387,7 +1639,10 @@ export function Workspace() {
                           <Button
                             size="sm"
                             disabled={
-                              applying || agentBusy || !instruction.trim()
+                              applying ||
+                              agentBusy ||
+                              !!draftConflict ||
+                              !instruction.trim()
                             }
                             onClick={() => void askAgent()}
                           >
@@ -1396,7 +1651,9 @@ export function Workspace() {
                             ) : (
                               <Sparkles size={14} />
                             )}
-                            Propose
+                            {agentPolicy.mode === "autonomous"
+                              ? "Apply"
+                              : "Propose"}
                           </Button>
                         </div>
                       </div>
@@ -1526,7 +1783,9 @@ export function Workspace() {
                                 <p>{finding.detail}</p>
                                 {finding.level === "warning" && finding.fix && (
                                   <button
-                                    disabled={applying || agentBusy}
+                                    disabled={
+                                      applying || agentBusy || !!draftConflict
+                                    }
                                     onClick={() =>
                                       fixFinding(finding.fix ?? "")
                                     }

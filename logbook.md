@@ -1,5 +1,9 @@
 # Logbook
 
+## 2026-11-12 — Per-resume agent autonomy
+
+Selected architecture B: a separate owner-scoped permission record and one atomic proposal/application path shared by HTTP and MCP. Review remains default; policy-version checks prevent in-flight requests gaining authority after a setting change. Added a persistent Assistant control and source reconciliation that preserves dirty drafts. Types, lint, 55 Bun tests/337 assertions and 11 Convex tests pass. Live deployment/browser verification follows; the existing preview and same persisted box are preserved.
+
 ## 2026-11-12 — PR opened
 
 Opened https://github.com/mgamergo/resume-tex/pull/1 from dev to main. GitHub reports MERGEABLE/CLEAN with no conflicts. Preserved the old dev tip at backup/dev-before-main-rebase-20261112 and pushed the rebase with an exact lease. Repository remains private; main is unchanged. Verification and cleanup are recorded below. The existing box and private preview remain running.

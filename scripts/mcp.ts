@@ -29,7 +29,7 @@ server.registerTool(
       {
         type: "text",
         text: JSON.stringify(
-          await executeTool(store, resumeId, { tool: "read_document" }),
+          await executeTool(store, { kind: "read", resumeId }),
         ),
       },
     ],
@@ -39,7 +39,7 @@ server.registerTool(
   "propose_edit",
   {
     description:
-      "Propose one validated structured edit for the selected resume. The UI must approve. No approval, arbitrary files, network, or shell tool is exposed.",
+      "Submit a validated structured edit for this resume. The owner's app setting determines whether it is queued for review or applied automatically. No permission-setting, arbitrary files, network, or shell tool is exposed.",
     inputSchema: {
       baseDigest: z.string().regex(/^[a-f0-9]{64}$/),
       call: toolCallSchema,
@@ -50,7 +50,12 @@ server.registerTool(
       {
         type: "text",
         text: JSON.stringify(
-          await executeTool(store, resumeId, call, baseDigest),
+          await executeTool(store, {
+            kind: "edit",
+            resumeId,
+            baseDigest,
+            action: { kind: "structured", call, verifiedEvidence: "" },
+          }),
         ),
       },
     ],

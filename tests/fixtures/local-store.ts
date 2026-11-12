@@ -13,13 +13,20 @@ import {
   DomainError,
   type Engine,
   type Proposal,
-  type ProposalInput,
   type Resume,
   type Revision,
   type RevisionSummary,
   type ResumeSummary,
 } from "../../lib/core/model";
 import { digest } from "../../lib/core/digest";
+import {
+  agentEditPolicySchema,
+  type AgentEditPolicy,
+  type SetAgentEditPolicy,
+  type SubmitProposal,
+  type SubmissionResult,
+} from "../../lib/core/agent-policy";
+const policies = new Map<string, AgentEditPolicy>();
 let database: Database.Database | undefined;
 function db() {
   if (database) return database;
@@ -60,6 +67,36 @@ export class LocalStore {
     );
     if (!value) throw new DomainError("Resume not found", 404);
     return value;
+  }
+  async readEditContext(id: string) {
+    const resume = await this.get(id);
+    return {
+      resume,
+      policy:
+        policies.get(`${this.owner}:${id}`) ??
+        ({ mode: "review", version: 0 } satisfies AgentEditPolicy),
+    };
+  }
+  async details(id: string) {
+    return {
+      ...(await this.readEditContext(id)),
+      history: await this.history(id),
+      proposals: await this.proposals(id),
+    };
+  }
+  async setAgentEditPolicy(
+    command: SetAgentEditPolicy,
+  ): Promise<AgentEditPolicy> {
+    const { policy } = await this.readEditContext(command.resumeId);
+    if (policy.version !== command.expectedVersion)
+      throw new DomainError("Agent permission changed", 409);
+    if (policy.mode === command.mode) return policy;
+    const next = agentEditPolicySchema.parse({
+      mode: command.mode,
+      version: policy.version + 1,
+    });
+    policies.set(`${this.owner}:${command.resumeId}`, next);
+    return next;
   }
   private write(resume: Resume, note: string) {
     db()
@@ -132,6 +169,7 @@ export class LocalStore {
   }
   async remove(id: string) {
     await this.get(id);
+    policies.delete(`${this.owner}:${id}`);
     db().transaction(() => {
       db()
         .prepare("DELETE FROM documents WHERE id=? AND owner=?")
@@ -175,22 +213,60 @@ export class LocalStore {
     if (!value) throw new DomainError("Revision not found", 404);
     return value;
   }
-  async propose(id: string, input: ProposalInput): Promise<Proposal> {
-    const current = await this.get(id);
-    if (current.digest !== input.baseDigest)
-      throw new DomainError("Document changed. Request a fresh proposal.", 409);
-    applyEdits(current.source, input.edits);
-    const proposal: Proposal = {
-      ...input,
-      id: randomUUID(),
-      resumeId: id,
-      status: "pending",
-      createdAt: Date.now(),
-    };
-    db()
-      .prepare("INSERT INTO proposals VALUES (?,?,?,?)")
-      .run(proposal.id, id, this.owner, JSON.stringify(proposal));
-    return proposal;
+  async propose(command: SubmitProposal): Promise<SubmissionResult> {
+    return db().transaction(() => {
+      const { resumeId: id, input } = command;
+      const current = rowBody(
+        resumeSchema,
+        db()
+          .prepare("SELECT body FROM documents WHERE id=? AND owner=?")
+          .get(id, this.owner),
+      );
+      if (!current) throw new DomainError("Resume not found", 404);
+      if (
+        current.digest !== input.baseDigest ||
+        current.revision !== command.expectedRevision
+      )
+        throw new DomainError(
+          "Document changed. Request a fresh proposal.",
+          409,
+        );
+      const source = applyEdits(current.source, input.edits);
+      const policy = policies.get(`${this.owner}:${id}`) ?? {
+        mode: "review",
+        version: 0,
+      };
+      const base = {
+        ...input,
+        id: randomUUID(),
+        resumeId: id,
+        createdAt: Date.now(),
+      };
+      if (
+        policy.mode === "autonomous" &&
+        policy.version === command.policyVersion &&
+        !input.evidenceNeeded.length
+      ) {
+        const proposal = { ...base, status: "accepted" } satisfies Proposal;
+        const resume = {
+          ...current,
+          source,
+          digest: digest(source),
+          revision: current.revision + 1,
+          updatedAt: Date.now(),
+        };
+        this.write(resume, `Accepted: ${proposal.title}`);
+        db()
+          .prepare("INSERT INTO proposals VALUES (?,?,?,?)")
+          .run(proposal.id, id, this.owner, JSON.stringify(proposal));
+        return { kind: "applied", proposal, resume } satisfies SubmissionResult;
+      }
+      const proposal = { ...base, status: "pending" } satisfies Proposal;
+      db()
+        .prepare("INSERT INTO proposals VALUES (?,?,?,?)")
+        .run(proposal.id, id, this.owner, JSON.stringify(proposal));
+      return { kind: "proposal", proposal } satisfies SubmissionResult;
+    })();
   }
   async proposals(id: string): Promise<Proposal[]> {
     await this.get(id);
@@ -225,6 +301,11 @@ export class LocalStore {
       if (proposal.status !== "pending")
         throw new DomainError("Proposal already reviewed", 409);
       if (accept) {
+        if (proposal.evidenceNeeded.length)
+          throw new DomainError(
+            "Resolve the proposal's evidence requirements before applying it",
+            422,
+          );
         if (current.digest !== proposal.baseDigest)
           throw new DomainError(
             "This proposal is stale. Request it again against the current source.",
