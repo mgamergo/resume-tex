@@ -13,8 +13,6 @@ import {
   Redo2,
   Search,
   History,
-  Sun,
-  Moon,
   PanelRightClose,
   PanelRightOpen,
   Sparkles,
@@ -31,7 +29,9 @@ import {
   CheckCheck,
   BookOpen,
 } from "lucide-react";
-import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
+import { UserButton } from "@clerk/nextjs";
+import { useTheme } from "@/lib/client/theme";
+import { ThemeSelect } from "./theme-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -120,30 +120,12 @@ function IconButton({
     </Tooltip>
   );
 }
-function ConnectedAccount() {
-  const { isSignedIn } = useUser();
-  return isSignedIn ? (
-    <UserButton />
-  ) : (
-    <SignInButton mode="modal">
-      <Button variant="outline" size="sm">
-        Sign in
-      </Button>
-    </SignInButton>
-  );
-}
-export function Workspace({
-  mode,
-  assistantMode,
-}: {
-  mode: "local" | "connected";
-  assistantMode: "offline" | "configured";
-}) {
+export function Workspace() {
+  const { dark } = useTheme();
   const [resumes, setResumes] = useState<ResumeSummary[]>([]);
   const [active, setActive] = useState<Resume | null>(null);
   const [source, setSource] = useState("");
   const [engine, setEngine] = useState<Engine>("pdflatex");
-  const [dark, setDark] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -245,13 +227,7 @@ export function Workspace({
   }, [report]);
   useEffect(() => {
     queueMicrotask(() => void refresh());
-    const stored = localStorage.getItem("resume-tex-theme");
-    queueMicrotask(() => setDark(stored === "dark"));
   }, [refresh]);
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-    localStorage.setItem("resume-tex-theme", dark ? "dark" : "light");
-  }, [dark]);
   useEffect(() => {
     const unload = (event: BeforeUnloadEvent) => {
       if (dirty) {
@@ -338,8 +314,6 @@ export function Workspace({
               ? "saved"
               : "unsaved",
           );
-          if (draftRef.current.source === draft.source)
-            localStorage.removeItem(`resume-tex-draft-${doc.id}`);
           await reloadDetails(doc.id);
           if (forceCompile) await compileDocument(result.resume);
           return result.resume;
@@ -395,31 +369,6 @@ export function Workspace({
         setNotice("");
         setSaveState("saved");
         setMobileView("source");
-        const stored = localStorage.getItem(`resume-tex-draft-${id}`);
-        if (stored) {
-          const draft = z
-            .object({
-              source: z.string().max(160_000),
-              engine: z.enum(["pdflatex", "xelatex"]),
-              revision: z.number(),
-            })
-            .safeParse(JSON.parse(stored));
-          if (draft.success) {
-            if (draft.data.revision === doc.revision) {
-              setSource(draft.data.source);
-              setEngine(draft.data.engine);
-              draftRef.current = {
-                source: draft.data.source,
-                engine: draft.data.engine,
-              };
-              setNotice("Recovered your unsaved draft from this browser.");
-            } else {
-              setNotice(
-                "A recovered draft conflicts with a newer revision. It is kept in this browser; download it from the command menu before replacing it.",
-              );
-            }
-          }
-        }
         void compileDocument(doc);
       } catch (reason) {
         report(reason);
@@ -432,14 +381,6 @@ export function Workspace({
     setSource(value);
     draftRef.current = { source: value, engine: draftRef.current.engine };
     setSaveState("unsaved");
-    if (activeRef.current)
-      localStorage.setItem(
-        `resume-tex-draft-${activeRef.current.id}`,
-        JSON.stringify({
-          ...draftRef.current,
-          revision: activeRef.current.revision,
-        }),
-      );
   };
   const goHome = async () => {
     if (activeRef.current && !(await save(false))) return;
@@ -503,7 +444,6 @@ export function Workspace({
         id: active.id,
       });
       if (!isCurrent(id, session)) return;
-      localStorage.removeItem(`resume-tex-draft-${id}`);
       documentSession.current++;
       activeRef.current = null;
       setActive(null);
@@ -555,6 +495,7 @@ export function Workspace({
     prompt?: string,
     verifiedEvidence?: string,
   ) => {
+    if (applyingRef.current) return;
     const session = documentSession.current;
     const doc = await save(false);
     if (!doc || !isCurrent(doc.id, session)) return;
@@ -577,9 +518,6 @@ export function Workspace({
       if (result.kind === "proposal") {
         setProposals((current) =>
           reconcileProposals(current, [result.proposal]),
-        );
-        setAgentMessage(
-          `${result.provider} prepared a proposal. Review the exact changes below.`,
         );
       } else
         setAgentMessage(
@@ -633,6 +571,7 @@ export function Workspace({
     }
   };
   const runAts = async () => {
+    if (applyingRef.current) return;
     const session = documentSession.current;
     const doc = await save(false);
     if (!doc || !isCurrent(doc.id, session)) return;
@@ -658,6 +597,7 @@ export function Workspace({
     }
   };
   const fixFinding = (fix: string) => {
+    if (applyingRef.current) return;
     if (fix === "columns") {
       void askAgent({ tool: "flatten_columns" });
       return;
@@ -723,23 +663,13 @@ export function Workspace({
       setMobileView("agent");
     }
   };
-  const downloadSource = (recovered = false) => {
-    let text = source;
-    if (recovered && active) {
-      const stored = localStorage.getItem(`resume-tex-draft-${active.id}`);
-      if (stored) {
-        const parsed = z
-          .object({ source: z.string() })
-          .safeParse(JSON.parse(stored));
-        if (parsed.success) text = parsed.data.source;
-      }
-    }
+  const downloadSource = () => {
     const url = URL.createObjectURL(
-      new Blob([text], { type: "application/x-tex" }),
+      new Blob([source], { type: "application/x-tex" }),
     );
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = recovered ? "recovered-draft.tex" : "resume.tex";
+    anchor.download = "resume.tex";
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
@@ -748,9 +678,7 @@ export function Workspace({
     "Find in source",
     "Version history",
     "Download LaTeX source",
-    "Download recovered draft",
     "Run ATS analysis",
-    "Toggle theme",
     "New resume from template",
   ];
   const runCommand = (name: string) => {
@@ -768,14 +696,8 @@ export function Workspace({
       case "Download LaTeX source":
         downloadSource();
         break;
-      case "Download recovered draft":
-        downloadSource(true);
-        break;
       case "Run ATS analysis":
         void runAts();
-        break;
-      case "Toggle theme":
-        setDark((value) => !value);
         break;
       case "New resume from template":
         setModal("gallery");
@@ -847,14 +769,7 @@ export function Workspace({
         "No exact source match for that PDF text. Commands and ligatures can change its representation.",
       );
   };
-  const themeButton = (
-    <IconButton
-      label={dark ? "Use light theme" : "Use dark theme"}
-      onClick={() => setDark((value) => !value)}
-    >
-      {dark ? <Sun size={17} /> : <Moon size={17} />}
-    </IconButton>
-  );
+  const themeButton = <ThemeSelect />;
   return (
     <TooltipProvider>
       <div className={`app-shell ${active ? "is-editing" : ""}`}>
@@ -866,7 +781,6 @@ export function Workspace({
               </span>
               <strong>Resume TeX</strong>
             </Link>
-            <div className="workspace-label">Your workspace</div>
             <nav>
               <button
                 className={dashboardTab === "resumes" ? "selected" : ""}
@@ -884,22 +798,9 @@ export function Workspace({
               </button>
             </nav>
             <div className="sidebar-bottom">
-              <div className="workspace-note">
-                <span className="status-dot" />
-                {mode === "local" ? "Local workspace" : "Connected workspace"}
-                <small>
-                  {mode === "local"
-                    ? "Stored on this server"
-                    : "Your private resume library"}
-                </small>
-              </div>
               <div className="account-row">
-                <div className="avatar">{mode === "local" ? "L" : "R"}</div>
-                <span>
-                  {mode === "local" ? "Local author" : "Your account"}
-                </span>
                 {themeButton}
-                {mode === "connected" && <ConnectedAccount />}
+                <UserButton />
               </div>
             </div>
           </aside>
@@ -966,6 +867,7 @@ export function Workspace({
                   </IconButton>
                   {themeButton}
                   <Button
+                    aria-label={busy ? "Compiling…" : "Compile"}
                     className="compile-button"
                     onClick={() => void save(true)}
                     disabled={applying || busy || saveState === "saving"}
@@ -1165,6 +1067,7 @@ export function Workspace({
                           <Button
                             variant="outline"
                             size="sm"
+                            disabled={applying || agentBusy}
                             onClick={() =>
                               void askAgent({
                                 tool: "fix_compile_error",
@@ -1311,20 +1214,12 @@ export function Workspace({
                         <span className="assistant-symbol">
                           <Sparkles size={21} />
                         </span>
-                        <h2>A second pair of eyes.</h2>
-                        <p>
-                          Make a stronger draft while keeping every word yours.
-                          Review each change before it reaches your resume.
-                        </p>
-                        <Badge variant="outline">
-                          {assistantMode === "offline"
-                            ? "Offline · deterministic assistant"
-                            : "Configured AI provider"}
-                        </Badge>
+                        <h2>Assistant</h2>
+                        <p>Ask for a change, then review the diff.</p>
                       </div>
                       <div className="suggestion-grid">
                         <button
-                          disabled={agentBusy}
+                          disabled={applying || agentBusy}
                           onClick={() => {
                             setInstruction(
                               "Tighten one bullet while preserving facts",
@@ -1339,7 +1234,7 @@ export function Workspace({
                           <ChevronRight size={13} />
                         </button>
                         <button
-                          disabled={agentBusy}
+                          disabled={applying || agentBusy}
                           onClick={() => {
                             const sections = [
                               ...source.matchAll(/\\section\*?\{([^}]+)\}/g),
@@ -1363,7 +1258,7 @@ export function Workspace({
                           <ChevronRight size={13} />
                         </button>
                         <button
-                          disabled={agentBusy || !job.trim()}
+                          disabled={applying || agentBusy || !job.trim()}
                           onClick={() =>
                             void askAgent({
                               tool: "tailor_to_job",
@@ -1383,12 +1278,7 @@ export function Workspace({
                       {pending.length === 0 ? (
                         <div className="no-proposals">
                           <Check size={17} />
-                          <p>
-                            No pending changes.
-                            <small>
-                              Your source stays untouched until you approve.
-                            </small>
-                          </p>
+                          <p>No pending changes.</p>
                         </div>
                       ) : (
                         pending.map((proposal) => (
@@ -1452,6 +1342,7 @@ export function Workspace({
                               <Button
                                 variant="outline"
                                 size="sm"
+                                disabled={applying}
                                 onClick={() => void decide(proposal, false)}
                               >
                                 Reject
@@ -1465,6 +1356,7 @@ export function Workspace({
                           variant="ghost"
                           size="sm"
                           className="undo-proposal"
+                          disabled={applying}
                           onClick={() => {
                             const index = history.findIndex((item) =>
                               item.note.startsWith("Accepted:"),
@@ -1483,6 +1375,7 @@ export function Workspace({
                         </label>
                         <Textarea
                           id="agent-instruction"
+                          disabled={applying}
                           placeholder="Tighten this bullet, preserve my facts…"
                           value={instruction}
                           onChange={(event) =>
@@ -1491,12 +1384,11 @@ export function Workspace({
                           maxLength={4000}
                         />
                         <div>
-                          <span>
-                            Changes are proposed, never applied silently.
-                          </span>
                           <Button
                             size="sm"
-                            disabled={agentBusy || !instruction.trim()}
+                            disabled={
+                              applying || agentBusy || !instruction.trim()
+                            }
                             onClick={() => void askAgent()}
                           >
                             {agentBusy ? (
@@ -1515,12 +1407,7 @@ export function Workspace({
                       className={`insight-content ats-content ${mobileView === "agent" ? "mobile-hide" : ""}`}
                     >
                       <div className="ats-intro">
-                        <h2>See what gets through.</h2>
-                        <p>
-                          Checks use text and geometry from your compiled PDF.
-                          Match a job description to find gaps in the language
-                          you use.
-                        </p>
+                        <h2>ATS check</h2>
                       </div>
                       <label htmlFor="job-description">
                         Job description <span>Optional</span>
@@ -1535,7 +1422,7 @@ export function Workspace({
                       />
                       <Button
                         onClick={() => void runAts()}
-                        disabled={atsBusy}
+                        disabled={applying || atsBusy}
                         className="run-ats"
                       >
                         {atsBusy ? (
@@ -1639,6 +1526,7 @@ export function Workspace({
                                 <p>{finding.detail}</p>
                                 {finding.level === "warning" && finding.fix && (
                                   <button
+                                    disabled={applying || agentBusy}
                                     onClick={() =>
                                       fixFinding(finding.fix ?? "")
                                     }
@@ -1685,12 +1573,6 @@ export function Workspace({
               </div>
               <footer className="workspace-footer">
                 <span>
-                  <span className="status-dot" />{" "}
-                  {mode === "local"
-                    ? "Private local workspace"
-                    : "Private connected workspace"}
-                </span>
-                <span>
                   Revision {active.revision}
                   <span className="footer-shortcut">⌘ / Ctrl S to compile</span>
                 </span>
@@ -1716,7 +1598,7 @@ export function Workspace({
                     Search commands<kbd>⌘ K</kbd>
                   </Button>
                   <span className="mobile-theme">{themeButton}</span>
-                  {mode === "connected" && <ConnectedAccount />}
+                  <UserButton />
                 </div>
               </header>
               <div className="dashboard-content">
@@ -1724,14 +1606,9 @@ export function Workspace({
                   <div>
                     <h1>
                       {dashboardTab === "templates"
-                        ? "A good place to begin."
-                        : "Make room for your next chapter."}
+                        ? "Templates"
+                        : "My resumes"}
                     </h1>
-                    <p>
-                      {dashboardTab === "templates"
-                        ? "Four carefully typeset starting points. Replace the fictional sample with your own story."
-                        : "Your experience, clearly told. Keep your resumes and their next drafts here."}
-                    </p>
                   </div>
                   <Button onClick={() => setModal("gallery")}>
                     <Plus size={16} />
@@ -1753,12 +1630,14 @@ export function Workspace({
                 )}
                 {dashboardTab === "resumes" && (
                   <>
-                    <div className="library-heading">
-                      <h2>
-                        My resumes <span>{resumes.length}</span>
-                      </h2>
-                      <span>Last edited</span>
-                    </div>
+                    {resumes.length > 0 && (
+                      <div className="library-heading">
+                        <h2>
+                          Resumes <span>{resumes.length}</span>
+                        </h2>
+                        <span>Last edited</span>
+                      </div>
+                    )}
                     {loading ? (
                       <div className="loading-state">
                         <LoaderCircle className="spin" />
@@ -1769,12 +1648,8 @@ export function Workspace({
                         <div className="empty-paper">
                           <FileText size={34} />
                         </div>
-                        <h2>Every next step starts with a draft.</h2>
-                        <p>
-                          Choose a template, bring your experience,
-                          <br />
-                          and make the details count.
-                        </p>
+                        <h2>Create your first resume</h2>
+                        <p>Choose a layout to start writing.</p>
                         <Button onClick={() => setModal("gallery")}>
                           <Plus size={16} />
                           Create your first resume
@@ -1824,13 +1699,8 @@ export function Workspace({
                       <h2>
                         {dashboardTab === "templates"
                           ? "Choose your layout"
-                          : "Start with a strong foundation"}
+                          : "Templates"}
                       </h2>
-                      <p>
-                        {dashboardTab === "templates"
-                          ? "Real LaTeX. Fully editable. Ready to compile."
-                          : "A few well-considered layouts, ready for your words."}
-                      </p>
                     </div>
                     {dashboardTab !== "templates" && (
                       <button onClick={() => setDashboardTab("templates")}>
@@ -1866,14 +1736,6 @@ export function Workspace({
                     ))}
                   </div>
                 </div>
-                <div className="dashboard-note">
-                  <Braces size={18} />
-                  <p>
-                    <strong>A document you own.</strong> Edit the LaTeX, review
-                    every assistant change, and download your source and PDF at
-                    any time.
-                  </p>
-                </div>
               </div>
             </>
           )}
@@ -1885,6 +1747,12 @@ export function Workspace({
           }}
         >
           <DialogContent
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setModal(null);
+              }
+            }}
             onCloseAutoFocus={(event) => {
               event.preventDefault();
               const opener = dialogOpener.current;
@@ -1984,7 +1852,10 @@ export function Workspace({
                   maxLength={1000}
                 />
                 <div className="dialog-actions">
-                  <Button type="submit" disabled={!verifiedEvidence.trim()}>
+                  <Button
+                    type="submit"
+                    disabled={applying || agentBusy || !verifiedEvidence.trim()}
+                  >
                     Review evidence proposal
                   </Button>
                 </div>
@@ -2074,7 +1945,12 @@ export function Workspace({
                     .map((command) => (
                       <button
                         key={command}
-                        disabled={!active && !/theme|new resume/i.test(command)}
+                        disabled={
+                          (!active && !/theme|new resume/i.test(command)) ||
+                          (applying &&
+                            (command === "Save and compile" ||
+                              command === "Run ATS analysis"))
+                        }
                         onClick={() => {
                           setModal(null);
                           runCommand(command);
@@ -2097,43 +1973,27 @@ function MiniPaper({ template }: { template: string }) {
   return (
     <div className={`mini-paper-preview mini-${template}`} aria-hidden="true">
       <div className="mini-paper">
-        <div className="mini-name">Alex Morgan</div>
-        <div className="mini-contact">Software Engineer · alex@example.com</div>
+        <div className="mini-name">
+          <i />
+        </div>
+        <div className="mini-contact">
+          <i />
+        </div>
         <div className="mini-columns">
           <div className="mini-main">
-            {["Experience", "Projects", "Education"].map((title, index) => (
-              <div className="mini-section" key={title}>
-                <strong>{title}</strong>
-                <b>
-                  {index === 0
-                    ? "Software Engineer"
-                    : index === 1
-                      ? "Open Source Issue Tracker"
-                      : "University of California"}
-                </b>
+            {[0, 1, 2].map((section) => (
+              <div className="mini-section" key={section}>
+                <strong />
                 <i />
                 <i />
                 <i className="short" />
-                {index === 0 && (
-                  <>
-                    <i />
-                    <i className="short" />
-                  </>
-                )}
               </div>
             ))}
           </div>
           <div className="mini-side">
             <div className="mini-section">
-              <strong>Skills</strong>
-              <b>TypeScript · React</b>
+              <strong />
               <i />
-              <i />
-              <i className="short" />
-            </div>
-            <div className="mini-section">
-              <strong>Education</strong>
-              <b>Computer Science</b>
               <i />
               <i className="short" />
             </div>

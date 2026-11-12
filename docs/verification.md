@@ -1,3 +1,7 @@
+# Historical v1 verification
+
+This record describes the previous local-only test environment. For the current real-service refresh, see `refresh-verification.md`. The old local startup commands below no longer apply.
+
 # V1 verification
 
 The application behavior at `2c2c3951639dc4c10c2c4c88c5e2913c9507092a` passed the complete local verification workflow in the one authorized boxes.dev devbox. The release documentation adds no application behavior. Review outcomes are recorded in [the Sol ledger](sol-reviews.md).

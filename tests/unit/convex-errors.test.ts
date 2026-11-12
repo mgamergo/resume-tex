@@ -20,7 +20,7 @@ test("expected structured Convex wire errors retain HTTP semantics while unknown
     expect(mapConvexError(error)?.status).toBe(status);
     expect(mapConvexError(error)?.message).toBe(message);
     await expect(
-      convexOperation(async () => {
+      convexOperation("query", async () => {
         throw error;
       }),
     ).rejects.toHaveProperty("status", status);
@@ -45,4 +45,25 @@ test("expected structured Convex wire errors retain HTTP semantics while unknown
       }),
     ),
   ).toBeUndefined();
+});
+
+test("Convex business errors never replay even when transport wording is present", async () => {
+  for (const error of [
+    new ConvexError("fetch failed"),
+    new ConvexError({
+      kind: "resume-tex",
+      status: 409,
+      code: "conflict",
+      message: "fetch failed",
+    }),
+  ]) {
+    let calls = 0;
+    await expect(
+      convexOperation("query", async () => {
+        calls++;
+        throw error;
+      }),
+    ).rejects.toBeInstanceOf(Error);
+    expect(calls).toBe(1);
+  }
 });

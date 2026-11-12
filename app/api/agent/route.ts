@@ -33,7 +33,7 @@ export async function POST(request: Request) {
         resume.digest,
         input.call ? input.verifiedEvidence : undefined,
       )),
-      provider: assistant.label,
+      provider: input.call ? "Structured edit tool" : assistant.label,
     });
   } catch (error) {
     return failure(error);

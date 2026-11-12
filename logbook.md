@@ -1,5 +1,48 @@
 # Logbook
 
+## 2026-11-12 — PR opened
+
+Opened https://github.com/mgamergo/resume-tex/pull/1 from dev to main. GitHub reports MERGEABLE/CLEAN with no conflicts. Preserved the old dev tip at backup/dev-before-main-rebase-20261112 and pushed the rebase with an exact lease. Repository remains private; main is unchanged. Verification and cleanup are recorded below. The existing box and private preview remain running.
+
+## 2026-11-12 — Rebased PR verified
+
+Combined candidate `b8ec52a600bf42ccf3f082ac6872628454f92bc5` passed trusted TeX setup, shell syntax, formatting, application/Convex typechecks, lint, build, 50 Bun tests/321 assertions, three Convex tests and 12 real-service Chromium cases in 4.9 minutes. An actual sandbox compile and PDF text extraction also passed with fullpage, Babel English and titlesec together. Nine diagnostic arrays are empty; two exact in-flight navigation cancellations remain separately recorded. Test users/documents were cleaned, test3100 stopped, and the existing box keeps the private preview. Marker and immutable captures are indexed in artifacts/pr-main-sync-evidence.json. The final documentation-only record does not change the tested digest.
+
+## 2026-11-12 — Prepare dev-to-main PR
+
+Rebased dev onto main `1906be0` and resolved the three conflicts. Kept real-service-only environment examples, both branches' history, Babel English/fullpage provisioning, repeatable shell setup, the configurable Node PDF worker with its existing main-branch limit, and the separate Convex typecheck. Preserved the pre-rebase dev tip in a backup ref. Full verification follows on the combined tree before the authorized dev update and PR creation. No merge into main or deployment is authorized.
+
+## 2026-11-11 — Refresh Sol approval
+
+The second UI/UX Sol round approved clean `f63eabf`: S1 and S2 resolved, Escape handling accepted, no new findings. The reviewer verified all eight correction screenshots against the evidence manifest and read the passing logs; it ran no suites or browsers. Two rounds used gpt-6.1-sol on high reasoning; usage was not returned. The tested behavior remains `cb6860c` with the recorded digest. This final change records approval only. The same box and private port-3000 preview remain in use; external MCP is intentionally unverified.
+
+## 2026-11-11 — UI corrections verified
+
+Candidate `cb6860c62bd14c7c3515d8558a50ef00121ade58` passed the focused repeated 360px keyboard check and the full gate: formatting, types, lint, build, 50 Bun tests/321 assertions, three Convex tests and 12 real-service Chromium cases. Nine diagnostic reports are empty; two exact in-flight navigation cancellations are saved separately. The evidence manifest covers 52 screenshots and seven videos. Test-owned users/documents and the test server are cleaned. The same box retains the live port-3000 preview. Sol round 2 will check the open findings and changed code; no push occurs during that review.
+
+## 2026-11-11 — Dialog key trace
+
+The first Escape fallback was insufficient. A focused browser trace showed Escape reaching the search input, becoming default-prevented and leaving the dialog open. The application dialog now handles Escape explicitly even when the underlying layer marks it prevented. Existing close/focus assertions remain; a focused repeated check must pass before another complete browser run. Temporary diagnostic test code was removed, while its ignored key trace and failed logs remain.
+
+## 2026-11-11 — Immediate dialog Escape
+
+The full review recheck exposed a real early-Escape race after command input autofocus, plus a separate upstream Convex write deadline. Added a narrow dialog-content keyboard fallback that respects already-handled events and retains the existing focus-return path. Repeated keyboard open/Escape/focus assertions now cover 360px in both themes. No writes are replayed after transport failure. The failed gate remains archived; a fresh complete gate follows.
+
+## 2026-11-11 — UI review corrections
+
+Sol round 1 found an unnamed Compile action at widths up to 360px and an ordering claim in the library heading. The compact action now has an explicit state-aware accessible name, and the heading reads “Resumes.” A real-service 360px regression checks both themes, header bounds, keyboard-triggered compilation and actual PDF rendering. Verification and the focused Sol recheck are recorded in `docs/refresh-sol-reviews.md`.
+
+## 2026-11-11 — Real-service refresh verified
+
+- Removed runtime local/mock/demo paths and browser draft persistence. Real Clerk/Convex ownership gates the workspace; only a configured compatible model is available. Four blank layouts preserve their engines/macros/fonts, including the sandbox fullpage dependency. Historical local documents and browser keys remain preserved and are not migrated.
+- Refreshed neutral light/near-black UI with blue accents and concise copy. A prepaint system/light/dark preference follows live OS changes and works without storage. Source/PDF focus, dialogs, async apply locks, editor isolation and PDF disposal are retained.
+- Real verification exposed strict-save field leakage and unreliable model offsets. Route projection and unique immutable exact-text selectors fix them while preserving public ranges, digest/CAS, tenant ownership and explicit review. Read transport has bounded safe recovery; writes never replay and report unknown outcome. No pooling changes were justified by real bounded comparisons.
+- Complete candidate 47a96ec passed format/types/lint/build, 50 Bun tests/321 assertions, three Convex tests and all 11 real-service Chromium cases (4.8 minutes). One external authenticated MCP case is intentionally skipped because credentials are absent. All eight saved diagnostic reports are empty; narrow explicit-navigation cancellations are recorded separately. The final marker/digest, 44 before/after frames and six videos are indexed in artifacts/refresh-final-evidence.json and docs/refresh-verification.md. Earlier failed/interrupted runs remain retained.
+- A moved test fixture initially added one test-owned SQLite row (2e790de2-0fe0-4d1b-a94b-1de48fd98260). Authorized exact-match cleanup removed only that row and its two revisions; unrelated row hashes and DB/WAL/SHM inodes are unchanged. The fixture now uses memory only. Evidence: artifacts/refresh-sqlite-cleanup.json. Real test users/documents were cleaned; test3100 is stopped. The authorized private real-service preview remains on3000.
+- Next: parent independent Sol review. No app publishing, main merge, Dokploy change or public port was performed. See docs/refresh-verification.md for commands, screenshots and Chromium/MCP limits.
+
+Earlier entries describe historical versions; their local-mode commands no longer apply.
+
 ## 2026-11-11 — Babel English for imported resumes
 
 - Provision `babel-english`, the separate TeX Live package supplying english.ldf; installed locally and refreshed toolchain manifests. Preserve existing source language settings instead of removing Babel. Other languages still require explicit provisioning.

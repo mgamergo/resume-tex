@@ -1,3 +1,4 @@
+import { acquireSessionToken } from "./session-token";
 import { auth } from "@clerk/nextjs/server";
 import { DomainError } from "../core/model";
 import { getStore } from "./store";
@@ -13,26 +14,16 @@ export async function scope(request: Request) {
     throw new DomainError("Cross-origin request denied", 403);
   if (Number(request.headers.get("content-length") ?? 0) > 512_000)
     throw new DomainError("Request exceeds 512 KB", 413);
-  let owner: string;
-  let token: string | undefined;
-  if (process.env.APP_MODE === "local") {
-    if (!["localhost", "127.0.0.1", "[::1]"].includes(hostUrl.hostname))
-      throw new DomainError("Local workspace only accepts loopback hosts", 403);
-    owner = "local-workspace";
-  } else {
-    if (process.env.APP_MODE !== "connected")
-      throw new DomainError(
-        "Configure APP_MODE=local or connected. See README.",
-        503,
-      );
-    const session = await auth();
-    if (!session.userId)
-      throw new DomainError("Sign in to access your resumes", 401);
-    owner = session.userId;
-    token = (await session.getToken({ template: "convex" })) ?? undefined;
-    if (!token)
-      throw new DomainError("Clerk Convex JWT template is missing", 503);
-  }
+  const session = await auth();
+  if (!session.userId)
+    throw new DomainError("Sign in to access your resumes", 401);
+  const owner = session.userId;
+  const token = await acquireSessionToken(
+    () => session.getToken({ template: "convex" }),
+    request.signal,
+  );
+  if (!token)
+    throw new DomainError("Clerk Convex JWT template is missing", 503);
   const now = Date.now();
   const path = requestUrl.pathname;
   const bucket =
@@ -61,7 +52,7 @@ export async function scope(request: Request) {
     for (const [id, value] of rates) if (value.until < now) rates.delete(id);
   if (rate.count > limit)
     throw new DomainError("Too many requests. Try again in a minute.", 429);
-  return { owner, store: getStore(owner, token) };
+  return { owner, store: getStore(token) };
 }
 export async function readJson(request: Request): Promise<unknown> {
   const reader = request.body?.getReader();

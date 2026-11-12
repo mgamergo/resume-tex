@@ -1,6 +1,6 @@
 # Template provenance
 
-`lib/core/templates.ts` contains four distinct original starter sources written for Resume TeX. All use explicitly fictional Alex Morgan sample data. The tiny dashboard illustrations are schematic layout thumbnails; the workspace always renders a real compiled PDF.
+`lib/core/templates.ts` contains four distinct original starter sources written for Resume TeX. All start blank, without names, employment claims, metrics, or sample skills. The tiny dashboard illustrations are schematic layout thumbnails; the workspace always renders a real compiled PDF.
 
 - **Jake's Resume** follows the familiar single-column technical-resume layout popularized by [jakegut/resume](https://github.com/jakegut/resume). This is an original adaptation with a smaller local macro surface, not a verbatim copy of Jake Gutierrez's source. The upstream project uses MIT. No upstream code or license text is represented as ours.
 - **Deedy** is an original two-column adaptation inspired by [deedy/Deedy-Resume](https://github.com/deedy/Deedy-Resume). It uses XeLaTeX and TeX Gyre Heros to avoid proprietary/macOS-only fonts. It does not embed Deedy's class or original Apache-2.0 source. It preserves the characteristic education/skills sidebar and career column, with different source implementation.

@@ -1,43 +1,51 @@
+import { createConvexFetch } from "./convex-fetch";
 import { convexOperation } from "./convex-errors";
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
-import { LocalStore } from "./local-store";
+
 import type {
   Engine,
   Proposal,
+  ProposalInput,
   Resume,
   ResumeSummary,
   Revision,
   RevisionSummary,
 } from "../core/model";
-export type Store = Pick<
-  LocalStore,
-  | "list"
-  | "get"
-  | "create"
-  | "save"
-  | "remove"
-  | "history"
-  | "revision"
-  | "propose"
-  | "proposals"
-  | "decide"
->;
-export function getStore(owner: string, token?: string): Store {
-  if (process.env.APP_MODE === "local") return new LocalStore(owner);
-  if (
-    process.env.APP_MODE !== "connected" ||
-    !process.env.NEXT_PUBLIC_CONVEX_URL ||
-    !token
-  )
-    throw new Error(
-      "Set APP_MODE=local explicitly, or configure Clerk and Convex for APP_MODE=connected.",
-    );
-  const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL);
-  client.setAuth(token);
+export interface Store {
+  list(): Promise<ResumeSummary[]>;
+  get(id: string): Promise<Resume>;
+  create(input: {
+    name: string;
+    source: string;
+    engine: Engine;
+    template: string;
+  }): Promise<Resume>;
+  save(input: SaveInput): Promise<Resume>;
+  remove(id: string): Promise<void>;
+  history(id: string): Promise<RevisionSummary[]>;
+  revision(id: string, revision: number): Promise<Revision>;
+  propose(id: string, input: ProposalInput): Promise<Proposal>;
+  proposals(id: string): Promise<Proposal[]>;
+  decide(id: string, proposalId: string, accept: boolean): Promise<Resume>;
+}
+export function getStore(token: string): Store {
+  if (!process.env.NEXT_PUBLIC_CONVEX_URL)
+    throw new Error("Configure NEXT_PUBLIC_CONVEX_URL through Infisical");
+  const queryClient = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL, {
+    fetch: createConvexFetch({ deadlineMs: 8_000 }),
+  });
+  const mutationClient = new ConvexHttpClient(
+    process.env.NEXT_PUBLIC_CONVEX_URL,
+    {
+      fetch: createConvexFetch(),
+    },
+  );
+  queryClient.setAuth(token);
+  mutationClient.setAuth(token);
   const query = <T>(op: string, args: Record<string, unknown> = {}) =>
-    convexOperation(() =>
-      client.query(
+    convexOperation("query", () =>
+      queryClient.query(
         makeFunctionReference<"query", { op: string; payload: string }, T>(
           "workspace:read",
         ),
@@ -45,8 +53,8 @@ export function getStore(owner: string, token?: string): Store {
       ),
     );
   const mutate = <T>(op: string, args: Record<string, unknown> = {}) =>
-    convexOperation(() =>
-      client.mutation(
+    convexOperation("mutation", () =>
+      mutationClient.mutation(
         makeFunctionReference<"mutation", { op: string; payload: string }, T>(
           "workspace:write",
         ),

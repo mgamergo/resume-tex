@@ -1,5 +1,7 @@
-import { rm, mkdir } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
+import { clerkSetup } from "@clerk/testing/playwright";
 export default async function setup() {
-  await rm(".data/e2e", { recursive: true, force: true });
-  await mkdir("artifacts", { recursive: true });
+  await mkdir("artifacts/refresh-after", { recursive: true });
+  await mkdir(".data", { recursive: true });
+  await clerkSetup({ dotenv: false });
 }
