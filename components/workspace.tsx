@@ -597,6 +597,10 @@ export function Workspace() {
       });
       if (!isCurrent(id, session)) return;
       documentSession.current++;
+      setConflict(null);
+      deferredHead.current = null;
+      setApplying(false);
+      loadingDocument.current = false;
       activeRef.current = null;
       setActive(null);
       setModal(null);

@@ -525,3 +525,113 @@ test("returning to resumes preserves typing entered during an awaited save", asy
     await page.unroute("**/api/workspace");
   }
 });
+
+test("deletion clears conflict and apply locks before creating another resume", async ({
+  page,
+}) => {
+  const first = await createResume(page);
+  await showAgent(page);
+  const setting = page.getByLabel("Agent edits", { exact: true });
+  await setting.selectOption("autonomous");
+  await expect(setting).toHaveValue("autonomous");
+  await expect(setting).toBeEnabled();
+  const committed = deferred();
+  const releaseAgent = deferred();
+  await page.route("**/api/agent", async (route) => {
+    const response = await route.fetch();
+    expect(submissionResultSchema.parse(await response.json()).kind).toBe(
+      "applied",
+    );
+    committed.release();
+    await releaseAgent.promise;
+    await route.fulfill({ response });
+  });
+  const deleteCurrent = async () => {
+    await page.locator(".document-name").click();
+    await page
+      .getByRole("button", { name: "Delete resume", exact: true })
+      .click();
+    const deleted = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/workspace" &&
+        response.request().method() === "POST" &&
+        response.request().postDataJSON()?.op === "delete",
+    );
+    await page
+      .getByRole("button", { name: "Delete resume", exact: true })
+      .click();
+    expect((await deleted).status()).toBe(200);
+    await expect(
+      page.getByRole("heading", {
+        name: "Create your first resume",
+        exact: true,
+      }),
+    ).toBeVisible();
+  };
+  const accepted = deferred();
+  const releaseAccept = deferred();
+  try {
+    await page
+      .getByRole("button", { name: "Put skills first", exact: true })
+      .click();
+    await committed.promise;
+    await first.editor.fill(
+      templates[0].source.replace("Alex Morgan", "Discarded Test Draft"),
+    );
+    releaseAgent.release();
+    await expect(page.locator(".draft-conflict")).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await deleteCurrent();
+    const second = await createResume(page);
+    expect(second.id).not.toBe(first.id);
+    await expect(second.editor).toBeEditable();
+    await showAgent(page);
+    await expect(setting).toHaveValue("review");
+    await page.unroute("**/api/agent");
+    await page
+      .getByRole("button", { name: "Put skills first", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Accept", exact: true }),
+    ).toBeVisible();
+    await page.route("**/api/workspace", async (route) => {
+      if (
+        route.request().method() !== "POST" ||
+        route.request().postDataJSON()?.op !== "decide"
+      ) {
+        await route.continue();
+        return;
+      }
+      const response = await route.fetch();
+      expect(response.status()).toBe(200);
+      accepted.release();
+      await releaseAccept.promise;
+      await route.fulfill({ response });
+    });
+    await page.getByRole("button", { name: "Accept", exact: true }).click();
+    await accepted.promise;
+    await expect(second.editor).toHaveAttribute("contenteditable", "false");
+    await deleteCurrent();
+    const third = await createResume(page);
+    expect(third.id).not.toBe(second.id);
+    releaseAccept.release();
+    await page.waitForLoadState("networkidle");
+    await expect(third.editor).toBeEditable();
+    await expect(third.editor).not.toContainText("Discarded Test Draft");
+    await expect(page.locator(".textLayer")).toContainText("Alex Morgan");
+    await expect(setting).toHaveValue("review");
+    const details = await page.request.get(
+      `/api/workspace?id=${encodeURIComponent(third.id)}`,
+    );
+    expect(details.status()).toBe(200);
+    expect(resumeSchema.parse((await details.json()).resume).source).toBe(
+      templates[0].source,
+    );
+    await assertDiagnostics(page);
+  } finally {
+    releaseAgent.release();
+    releaseAccept.release();
+    await page.unroute("**/api/agent");
+    await page.unroute("**/api/workspace");
+  }
+});
