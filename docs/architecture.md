@@ -1,27 +1,15 @@
 # Architecture
 
-LaTeX source is the authoritative document. A saved revision is immutable. A successful PDF and ATS report identify the source digest used to produce them. A later source edit makes those artifacts stale until compilation succeeds again.
+LaTeX source is authoritative. The browser uses Clerk to obtain a Convex JWT. Convex derives document ownership from the verified identity, stores immutable revisions, and atomically checks digest plus revision on saves. The browser keeps unsaved drafts in memory and preserves them on conflicts.
 
-The editor saves with an expected revision. A conflicting save is reported instead of overwriting another session. Restoring history creates a new revision. AI proposals carry their base digest and exact expected text. Only a user acceptance writes a proposal, and a changed base rejects it.
+The editor pairs CodeMirror with a PDF preview. These modules load when a document opens. PDF.js loads one document per artifact, retains it across zoom changes, renders only pages near the viewport, and releases offscreen canvases. Visible page bitmaps have a four-million-pixel budget. Document refresh pauses while the browser tab is hidden. Optional ATS analysis runs on request against the actual compiled PDF.
 
-Server routes own authentication and transport validation. A persistence adapter owns durable transitions, using authenticated Convex storage. Convex also checks Clerk identity and ownership itself. Structured edit tools are shared by the assistant and MCP transport. Providers produce proposals rather than writes.
+MCP uses the existing public domain at `/api/mcp`. The configured personal Clerk account creates expiring opaque credentials. Convex stores only their hashes, resolves ownership from a valid key, and checks revocation and expiry inside every save transaction. Agent reads also use fresh transactions so cached query results cannot outlive key expiry. Browser and MCP saves share the same private owner-scoped implementation. Public functions never trust a submitted owner ID. See [agent connection instructions](agent-tools.md).
 
-Compilation takes fixed source and a selected engine profile. The supervisor owns sandbox creation, timeouts, resource limits, cache identity and artifact collection. Compiler children receive no application environment or credentials. The browser displays real output through PDF.js and derives ATS input from those PDF bytes.
+The HTTP adapter creates a request-local MCP server and stateless transport. It does not maintain a session registry or event stream. Agents read and write source, export LaTeX, compile, and read binary PDF resources. The stdio bridge forwards the same protocol and needs only the endpoint and bearer key.
 
-Design alternatives considered: (1) canonical resume JSON generating LaTeX, rejected for lossy arbitrary-source editing; (2) browser-only compilation, deferred for package/font compatibility and client resource variability; (3) server TeX Live with immutable revisions, chosen for predictable template coverage and shared validation.
+Compilation uses the existing Bubblewrap sandbox with offline TeX, a clean environment, bounded scratch space, kernel resource limits, deadline, one worker, and a bounded queue/cache. PDF resources verify the artifact against the requested revision and engine. No public object storage is required. See [compilation](compilation.md).
 
-## Public domain contracts
+The in-app Assistant, provider adapter, proposal APIs, and proposal state were removed. Existing historical proposal records remain untouched. No AI provider configuration is required.
 
-- Save: `{ documentId, expectedRevision, source, title }` produces a new immutable revision or a conflict.
-- Compile: `{ source, engine }` produces a discriminated success/failure result with source digest, bounded log and source diagnostics.
-- Proposal: `{ baseDigest, edits: [{ from, to, expected, replacement }], explanation }` validates before any mutation.
-- Agent: provider-neutral structured tool calls; read, patch ranges, insert section, rewrite bullet, reorder sections, fix diagnostics and tailor against job data.
-- ATS: PDF extraction plus geometry, parsed fields, matched/missing terms, weighted breakdown and explicit limitations.
-
-Single-app modules keep call chains short. Separate deployment services or queues can replace the local compiler supervisor without changing the edit or scoring domain.
-
-## Model-selected source edits
-
-The provider asks the model for exact source text and replacement text. The adapter locates a unique occurrence in the immutable source snapshot before the request. Empty, missing, ambiguous, and overlapping selections fail. JavaScript computes the UTF-16 offsets, so the model does not count characters.
-
-The public structured tools and MCP retain exact numeric ranges. Shared validation still enforces factual evidence, edit bounds, digest freshness, revision compare-and-set, and user approval. The adapter never searches a newer revision or uses approximate matching.
+The design considered maintaining a trusted gateway's Clerk session instead of issuing MCP keys. Dedicated credentials avoid interactive session renewal and permit direct revocation. The tradeoff is custom bearer configuration rather than OAuth discovery. Browser ownership remains tenant-scoped; MCP issuance is restricted to the configured personal account. Both independent design assessments favored this boundary.

@@ -24,35 +24,18 @@ export async function scope(request: Request) {
   );
   if (!token)
     throw new DomainError("Clerk Convex JWT template is missing", 503);
-  const now = Date.now();
-  const path = requestUrl.pathname;
   const bucket =
-    path === "/api/agent"
-      ? "agent"
-      : path === "/api/ats"
-        ? "ats"
-        : path === "/api/compile"
-          ? "compile"
-          : "workspace";
-  const limit =
-    bucket === "agent" || bucket === "ats"
-      ? 20
-      : bucket === "compile"
-        ? 60
-        : 300;
-  const key = `${owner}:${bucket}`;
-  const previous = rates.get(key);
-  const rate =
-    previous && previous.until > now
-      ? previous
-      : { count: 0, until: now + 60_000 };
-  rate.count++;
-  rates.set(key, rate);
-  if (rates.size > 10_000)
-    for (const [id, value] of rates) if (value.until < now) rates.delete(id);
-  if (rate.count > limit)
-    throw new DomainError("Too many requests. Try again in a minute.", 429);
-  return { owner, store: getStore(token) };
+    requestUrl.pathname === "/api/ats"
+      ? "ats"
+      : requestUrl.pathname === "/api/compile"
+        ? "compile"
+        : "workspace";
+  checkRate(
+    owner,
+    bucket,
+    bucket === "ats" ? 20 : bucket === "compile" ? 60 : 300,
+  );
+  return { owner, token, store: getStore(token) };
 }
 export async function readJson(request: Request): Promise<unknown> {
   const reader = request.body?.getReader();
@@ -100,4 +83,20 @@ export function failure(error: unknown) {
     { error: "The operation failed. Check server configuration and logs." },
     { status: 500 },
   );
+}
+
+export function checkRate(owner: string, bucket: string, limit: number) {
+  const now = Date.now();
+  const key = owner + ":" + bucket;
+  const previous = rates.get(key);
+  const rate =
+    previous && previous.until > now
+      ? previous
+      : { count: 0, until: now + 60_000 };
+  rate.count++;
+  rates.set(key, rate);
+  if (rates.size > 10_000)
+    for (const [id, value] of rates) if (value.until < now) rates.delete(id);
+  if (rate.count > limit)
+    throw new DomainError("Too many requests. Try again in a minute.", 429);
 }

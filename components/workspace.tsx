@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import { reconcileProposals } from "@/lib/client/proposals";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import {
@@ -15,7 +14,6 @@ import {
   History,
   PanelRightClose,
   PanelRightOpen,
-  Sparkles,
   Check,
   AlertCircle,
   Trash2,
@@ -50,50 +48,44 @@ import {
   TooltipContent,
   TooltipProvider,
 } from "@/components/ui/tooltip";
-import { SourceEditor, type EditorHandle } from "./source-editor";
-import { PdfPreview } from "./pdf-preview";
+import type { EditorHandle } from "./source-editor";
+import dynamic from "next/dynamic";
+import { McpKeys } from "./mcp-keys";
+const SourceEditor = dynamic(
+  () => import("./source-editor").then((m) => m.SourceEditor),
+  { ssr: false },
+);
+const PdfPreview = dynamic(
+  () => import("./pdf-preview").then((m) => m.PdfPreview),
+  { ssr: false },
+);
 import { api } from "@/lib/client/api";
 import { templates } from "@/lib/core/templates";
 import {
   resumeSchema,
   resumeSummarySchema,
+  revisionSummarySchema,
   compileSchema,
   atsSchema,
 } from "@/lib/core/schemas";
 import type {
   Engine,
-  Proposal,
   Resume,
   ResumeSummary,
   RevisionSummary,
 } from "@/lib/core/model";
 import type { CompileResult } from "@/lib/server/compiler";
 import type { AtsReport } from "@/lib/core/ats";
-import type { ToolCall } from "@/lib/server/tools";
-import {
-  agentEditModeSchema,
-  agentEditPolicySchema,
-  submissionResultSchema,
-  workspaceDetailsSchema,
-  type AgentEditPolicy,
-} from "@/lib/core/agent-policy";
 import { classifyResumeHead } from "@/lib/client/resume-head";
 type DraftConflict =
   { kind: "changed"; resume: Resume } | { kind: "unconfirmed" };
 const documentResponse = z.object({ resume: resumeSchema });
-const detailResponse = workspaceDetailsSchema;
-const assistantResponse = z.union([
-  submissionResultSchema.and(z.object({ provider: z.string() })),
-  z.object({
-    kind: z.literal("document"),
-    resume: resumeSchema,
-    policy: agentEditPolicySchema,
-    provider: z.string(),
-  }),
-]);
-type Modal =
-  "gallery" | "history" | "rename" | "delete" | "commands" | "evidence" | null;
-type MobileView = "source" | "pdf" | "agent" | "ats";
+const detailResponse = z.object({
+  resume: resumeSchema,
+  history: z.array(revisionSummarySchema),
+});
+type Modal = "gallery" | "history" | "rename" | "delete" | "commands" | null;
+type MobileView = "source" | "pdf" | "ats";
 function IconButton({
   label,
   children,
@@ -135,14 +127,6 @@ export function Workspace() {
   const [name, setName] = useState("");
   const [creating, setCreating] = useState("");
   const [history, setHistory] = useState<RevisionSummary[]>([]);
-  const [proposals, setProposals] = useState<Proposal[]>([]);
-  const [agentPolicy, setAgentPolicy] = useState<AgentEditPolicy>({
-    mode: "review",
-    version: 0,
-  });
-  const policyRef = useRef(agentPolicy);
-  const [policySaving, setPolicySaving] = useState(false);
-  const policyRequest = useRef<{ id: string; session: number } | null>(null);
   const deferredHead = useRef<Resume | null>(null);
   const [draftConflict, setDraftConflict] = useState<DraftConflict | null>(
     null,
@@ -167,23 +151,14 @@ export function Workspace() {
   const [saveState, setSaveState] = useState<
     "saved" | "unsaved" | "saving" | "error"
   >("saved");
-  const [panel, setPanel] = useState<"agent" | "ats" | null>("agent");
+  const [panel, setPanel] = useState<"ats" | null>(null);
   const [mobileView, setMobileView] = useState<MobileView>("source");
   const [showLog, setShowLog] = useState(false);
-  const [instruction, setInstruction] = useState("");
-  const [agentBusy, setAgentBusy] = useState(false);
-  const [agentMessage, setAgentMessage] = useState("");
   const [job, setJob] = useState("");
   const [ats, setAts] = useState<AtsReport | null>(null);
   const [atsBusy, setAtsBusy] = useState(false);
   const [split, setSplit] = useState(49);
   const [commandQuery, setCommandQuery] = useState("");
-  const [verifiedEvidence, setVerifiedEvidence] = useState("");
-  const [evidenceRange, setEvidenceRange] = useState<{
-    start: number;
-    end: number;
-    expected: string;
-  } | null>(null);
   const [dashboardTab, setDashboardTab] = useState("resumes");
   const dialogOpener = useRef<HTMLElement | null>(null);
   const findAfterClose = useRef(false);
@@ -208,7 +183,6 @@ export function Workspace() {
   const savePromise = useRef<Promise<Resume | null> | null>(null);
   const compileSequence = useRef(0);
   const workspace = useRef<HTMLDivElement>(null);
-  const pending = proposals.filter((proposal) => proposal.status === "pending");
   const dirty =
     !!active && (source !== active.source || engine !== active.engine);
   const pdfStale =
@@ -352,10 +326,6 @@ export function Workspace() {
         detailResponse,
       );
       if (session === documentSession.current && activeRef.current?.id === id) {
-        if (detail.policy.version >= policyRef.current.version) {
-          policyRef.current = detail.policy;
-          setAgentPolicy(detail.policy);
-        }
         if (
           detail.resume.revision >=
           Math.max(
@@ -364,9 +334,6 @@ export function Workspace() {
           )
         )
           setHistory(detail.history);
-        setProposals((current) =>
-          reconcileProposals(current, detail.proposals),
-        );
         reconcileHead(detail.resume);
       }
       return detail;
@@ -473,17 +440,10 @@ export function Workspace() {
         const detail = await reloadDetails(id);
         if (session !== documentSession.current) return;
         const doc = detail.resume;
-        policyRef.current = detail.policy;
-        setAgentPolicy(detail.policy);
-        policyRequest.current = null;
-        setPolicySaving(false);
         deferredHead.current = null;
         setConflict(null);
         setHistory(detail.history);
-        setProposals(detail.proposals);
-        setAgentBusy(false);
         setAtsBusy(false);
-        setAgentMessage("");
         activeRef.current = doc;
         draftRef.current = { source: doc.source, engine: doc.engine };
         setActive(doc);
@@ -649,138 +609,6 @@ export function Workspace() {
       }
     }
   };
-  const changeAgentPolicy = async (mode: AgentEditPolicy["mode"]) => {
-    const id = activeRef.current?.id;
-    if (!id || policyRequest.current || mode === policyRef.current.mode) return;
-    const request = { id, session: documentSession.current };
-    policyRequest.current = request;
-    setPolicySaving(true);
-    try {
-      const result = await api(
-        "/api/workspace",
-        z.object({ policy: agentEditPolicySchema }),
-        {
-          op: "agent_policy",
-          resumeId: id,
-          mode,
-          expectedVersion: policyRef.current.version,
-        },
-      );
-      if (!isCurrent(id, request.session)) return;
-      if (result.policy.version >= policyRef.current.version) {
-        policyRef.current = result.policy;
-        setAgentPolicy(result.policy);
-      }
-      await reloadDetails(id);
-    } catch (reason) {
-      if (isCurrent(id, request.session)) {
-        report(reason);
-        try {
-          await reloadDetails(id);
-        } catch (refreshError) {
-          report(refreshError);
-        }
-      }
-    } finally {
-      if (policyRequest.current === request) {
-        policyRequest.current = null;
-        setPolicySaving(false);
-      }
-    }
-  };
-  const askAgent = async (
-    call?: ToolCall,
-    prompt?: string,
-    verifiedEvidence?: string,
-  ) => {
-    if (applyingRef.current) return;
-    const session = documentSession.current;
-    const doc = await save(false);
-    if (!doc || !isCurrent(doc.id, session)) return;
-    setAgentBusy(true);
-    setPanel("agent");
-    setMobileView("agent");
-    setAgentMessage("");
-    setError("");
-    try {
-      const result = await api("/api/agent", assistantResponse, {
-        id: doc.id,
-        baseDigest: doc.digest,
-        instruction: prompt ?? instruction,
-        jobDescription: job,
-        log: compileResult?.log ?? "",
-        call,
-        verifiedEvidence,
-      });
-      if (!isCurrent(doc.id, session)) return;
-      if (result.kind === "proposal" || result.kind === "applied") {
-        setProposals((current) =>
-          reconcileProposals(current, [result.proposal]),
-        );
-        if (result.kind === "applied") {
-          reconcileHead(result.resume);
-          setAgentMessage(`Applied: ${result.proposal.title}`);
-          await reloadDetails(doc.id);
-        }
-      } else {
-        if (result.policy.version >= policyRef.current.version) {
-          policyRef.current = result.policy;
-          setAgentPolicy(result.policy);
-        }
-        setAgentMessage(
-          `Read revision ${result.resume.revision}. Source has ${result.resume.source.split("\n").length} lines. Add factual evidence in the editor, then request a targeted change.`,
-        );
-      }
-    } catch (reason) {
-      if (isCurrent(doc.id, session)) report(reason);
-    } finally {
-      if (isCurrent(doc.id, session)) setAgentBusy(false);
-    }
-  };
-  const decide = async (proposal: Proposal, accept: boolean) => {
-    if (applyingRef.current) return;
-    const session = documentSession.current;
-    setApplying(true);
-    try {
-      const doc = await save(false);
-      if (!doc || !isCurrent(doc.id, session)) return;
-      const result = await api("/api/workspace", documentResponse, {
-        op: "decide",
-        id: doc.id,
-        proposalId: proposal.id,
-        accept,
-      });
-      if (!isCurrent(doc.id, session)) return;
-      setProposals((current) =>
-        reconcileProposals(current, [
-          { ...proposal, status: accept ? "accepted" : "rejected" },
-        ]),
-      );
-      if (accept) {
-        activeRef.current = result.resume;
-        draftRef.current = {
-          source: result.resume.source,
-          engine: result.resume.engine,
-        };
-        setActive(result.resume);
-        setSource(result.resume.source);
-        setEngine(result.resume.engine);
-        setSaveState("saved");
-        setNotice(
-          "Proposal accepted. Use Undo proposal to restore its previous revision.",
-        );
-        await compileDocument(result.resume);
-      }
-      await reloadDetails(doc.id);
-    } catch (reason) {
-      if (session === documentSession.current) report(reason);
-    } finally {
-      if (session === documentSession.current) {
-        setApplying(false);
-        reconcileHead(deferredHead.current);
-      }
-    }
-  };
   const runAts = async () => {
     if (applyingRef.current) return;
     const session = documentSession.current;
@@ -805,73 +633,6 @@ export function Workspace() {
       if (isCurrent(doc.id, session)) report(reason);
     } finally {
       if (isCurrent(doc.id, session)) setAtsBusy(false);
-    }
-  };
-  const fixFinding = (fix: string) => {
-    if (applyingRef.current) return;
-    if (fix === "columns") {
-      void askAgent({ tool: "flatten_columns" });
-      return;
-    }
-    if (fix === "impact") {
-      const from = Math.max(0, source.indexOf("\\begin{document}"));
-      const match = source
-        .slice(from)
-        .match(/\\resumeItem\{([^\n}]+)\}|\\item\s+([^\n]+)/);
-      const expected = match?.[1] ?? match?.[2];
-      if (match && match.index !== undefined && expected) {
-        const start = from + match.index + match[0].indexOf(expected);
-        setEvidenceRange({ start, end: start + expected.length, expected });
-        setVerifiedEvidence("");
-        setModal("evidence");
-      } else {
-        setAgentMessage(
-          "Select a bullet in the editor and add a verified outcome to its source before requesting a rewrite.",
-        );
-        setPanel("agent");
-        setMobileView("agent");
-      }
-      return;
-    }
-    const missing = ["Experience", "Education", "Skills"].find(
-      (heading) =>
-        !new RegExp(`\\\\section\\*?\\{${heading}\\}`, "i").test(source),
-    );
-    if (missing) {
-      const aliases: Record<string, string[]> = {
-        Skills: ["Toolbox", "Technologies", "Technical expertise"],
-        Experience: ["Work", "Employment history"],
-        Education: ["Studies", "Academic background"],
-      };
-      const existing = (aliases[missing] ?? [])
-        .map((alias) => ({ alias, token: `\\section{${alias}}` }))
-        .find((candidate) => source.includes(candidate.token));
-      if (existing) {
-        const start = source.indexOf(existing.token);
-        void askAgent({
-          tool: "range_patch",
-          title: `Use a recognizable ${missing} heading`,
-          edits: [
-            {
-              start,
-              end: start + existing.token.length,
-              expected: existing.token,
-              replacement: `\\section{${missing}}`,
-            },
-          ],
-        });
-      } else
-        void askAgent({
-          tool: "insert_section",
-          heading: missing,
-          content: "[Add your verified details here.]",
-        });
-    } else {
-      setAgentMessage(
-        "Your source headings exist. Inspect What ATS sees for layout or extraction issues before changing content.",
-      );
-      setPanel("agent");
-      setMobileView("agent");
     }
   };
   const downloadSource = () => {
@@ -935,7 +696,7 @@ export function Workspace() {
     let disposed = false;
     let pending = false;
     const interval = setInterval(() => {
-      if (pending || loadingDocument.current) return;
+      if (document.hidden || pending || loadingDocument.current) return;
       pending = true;
       void reloadDetails(activeId)
         .catch((reason) => {
@@ -1012,6 +773,7 @@ export function Workspace() {
             </nav>
             <div className="sidebar-bottom">
               <div className="account-row">
+                <McpKeys />
                 {themeButton}
                 <UserButton />
               </div>
@@ -1078,6 +840,7 @@ export function Workspace() {
                   >
                     <History size={17} />
                   </IconButton>
+                  <McpKeys />
                   {themeButton}
                   <Button
                     aria-label={busy ? "Compiling…" : "Compile"}
@@ -1114,7 +877,7 @@ export function Workspace() {
                 role="tablist"
                 aria-label="Workspace view"
               >
-                {(["source", "pdf", "agent", "ats"] satisfies MobileView[]).map(
+                {(["source", "pdf", "ats"] satisfies MobileView[]).map(
                   (view) => (
                     <button
                       role="tab"
@@ -1122,19 +885,14 @@ export function Workspace() {
                       key={view}
                       onClick={() => {
                         setMobileView(view);
-                        if (view === "agent" || view === "ats") setPanel(view);
+                        if (view === "ats") setPanel(view);
                       }}
                     >
                       {view === "source"
                         ? "LaTeX"
                         : view === "pdf"
                           ? "PDF"
-                          : view === "agent"
-                            ? "Assistant"
-                            : "ATS check"}
-                      {view === "agent" && pending.length > 0 && (
-                        <span>{pending.length}</span>
-                      )}
+                          : "ATS check"}
                     </button>
                   ),
                 )}
@@ -1246,9 +1004,6 @@ export function Workspace() {
                       }}
                       dark={dark}
                       diagnostics={compileResult?.diagnostics ?? []}
-                      edits={pending
-                        .filter((p) => p.baseDigest === active.digest && !dirty)
-                        .flatMap((p) => p.edits)}
                     />
                     <footer className="source-footer">
                       <span>
@@ -1296,21 +1051,6 @@ export function Workspace() {
                             {diagnostic.message}
                           </button>
                         ))}
-                        {compileResult && !compileResult.ok && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={applying || agentBusy || !!draftConflict}
-                            onClick={() =>
-                              void askAgent({
-                                tool: "fix_compile_error",
-                                log: compileResult.log,
-                              })
-                            }
-                          >
-                            Propose a fix
-                          </Button>
-                        )}
                         <pre>
                           {compileResult?.log ??
                             "Compile to see engine output."}
@@ -1359,12 +1099,6 @@ export function Workspace() {
                       </span>
                       <div>
                         <IconButton
-                          label="Show assistant"
-                          onClick={() => setPanel("agent")}
-                        >
-                          <Sparkles size={15} />
-                        </IconButton>
-                        <IconButton
                           label="Show ATS check"
                           onClick={() => setPanel("ats")}
                         >
@@ -1372,7 +1106,7 @@ export function Workspace() {
                         </IconButton>
                         <IconButton
                           label={panel ? "Hide side panel" : "Show side panel"}
-                          onClick={() => setPanel(panel ? null : "agent")}
+                          onClick={() => setPanel(panel ? null : "ats")}
                         >
                           {panel ? (
                             <PanelRightClose size={15} />
@@ -1410,22 +1144,13 @@ export function Workspace() {
                 </div>
                 <aside className={`insight-panel ${panel ?? "closed"}`}>
                   <Tabs
-                    value={panel ?? "agent"}
+                    value={panel ?? "ats"}
                     onValueChange={(value) =>
-                      setPanel(value === "ats" ? "ats" : "agent")
+                      setPanel(value === "ats" ? "ats" : null)
                     }
                   >
                     <div className="insight-header">
                       <TabsList>
-                        <TabsTrigger value="agent">
-                          <Sparkles size={14} />
-                          Assistant
-                          {pending.length > 0 && (
-                            <span className="count-badge">
-                              {pending.length}
-                            </span>
-                          )}
-                        </TabsTrigger>
                         <TabsTrigger value="ats">
                           <CheckCheck size={14} />
                           ATS check
@@ -1439,245 +1164,8 @@ export function Workspace() {
                       </IconButton>
                     </div>
                     <TabsContent
-                      value="agent"
-                      forceMount
-                      className={`insight-content agent-content ${mobileView === "ats" ? "mobile-hide" : ""}`}
-                    >
-                      <div className="assistant-intro">
-                        <span className="assistant-symbol">
-                          <Sparkles size={21} />
-                        </span>
-                        <h2>Assistant</h2>
-                        <p>
-                          {agentPolicy.mode === "autonomous"
-                            ? "Agent edits apply automatically."
-                            : "Ask for a change, then review the diff."}
-                        </p>
-                      </div>
-                      <div className="agent-policy-setting">
-                        <label htmlFor="agent-edit-mode">Agent edits</label>
-                        <select
-                          id="agent-edit-mode"
-                          value={agentPolicy.mode}
-                          disabled={policySaving || applying}
-                          onChange={(event) =>
-                            void changeAgentPolicy(
-                              agentEditModeSchema.parse(event.target.value),
-                            )
-                          }
-                        >
-                          <option value="review">Review each edit</option>
-                          <option value="autonomous">
-                            Apply automatically
-                          </option>
-                        </select>
-                        <small>
-                          For this resume, including connected MCP agents.
-                        </small>
-                        {policySaving && (
-                          <span role="status">Saving permission…</span>
-                        )}
-                      </div>
-                      <div className="suggestion-grid">
-                        <button
-                          disabled={applying || agentBusy || !!draftConflict}
-                          onClick={() => {
-                            setInstruction(
-                              "Tighten one bullet while preserving facts",
-                            );
-                            void askAgent(
-                              undefined,
-                              "Tighten one bullet while preserving facts",
-                            );
-                          }}
-                        >
-                          Tighten a bullet
-                          <ChevronRight size={13} />
-                        </button>
-                        <button
-                          disabled={applying || agentBusy || !!draftConflict}
-                          onClick={() => {
-                            const sections = [
-                              ...source.matchAll(/\\section\*?\{([^}]+)\}/g),
-                            ].map((match) => match[1]);
-                            const skills = sections.find((section) =>
-                              /skills/i.test(section),
-                            );
-                            if (skills)
-                              void askAgent({
-                                tool: "reorder_sections",
-                                order: [
-                                  skills,
-                                  ...sections.filter(
-                                    (section) => section !== skills,
-                                  ),
-                                ],
-                              });
-                          }}
-                        >
-                          Put skills first
-                          <ChevronRight size={13} />
-                        </button>
-                        <button
-                          disabled={
-                            applying ||
-                            agentBusy ||
-                            !!draftConflict ||
-                            !job.trim()
-                          }
-                          onClick={() =>
-                            void askAgent({
-                              tool: "tailor_to_job",
-                              jobDescription: job,
-                            })
-                          }
-                        >
-                          Tailor to the job
-                          <ChevronRight size={13} />
-                        </button>
-                      </div>
-                      {agentMessage && (
-                        <p className="agent-message" role="status">
-                          {agentMessage}
-                        </p>
-                      )}
-                      {pending.length === 0 ? (
-                        <div className="no-proposals">
-                          <Check size={17} />
-                          <p>No pending changes.</p>
-                        </div>
-                      ) : (
-                        pending.map((proposal) => (
-                          <article className="proposal-card" key={proposal.id}>
-                            <div className="proposal-heading">
-                              <span className="proposal-icon">
-                                <Pencil size={13} />
-                              </span>
-                              <strong>{proposal.title}</strong>
-                            </div>
-                            <p>{proposal.explanation}</p>
-                            {proposal.baseDigest !== active.digest || dirty ? (
-                              <div className="stale-proposal">
-                                Document changed. Reject this proposal and
-                                request a fresh one.
-                              </div>
-                            ) : null}
-                            {proposal.edits.map((edit, index) => (
-                              <div className="diff-review" key={index}>
-                                <div className="diff-line-number">
-                                  Lines{" "}
-                                  {
-                                    source.slice(0, edit.start).split("\n")
-                                      .length
-                                  }
-                                  –
-                                  {source.slice(0, edit.end).split("\n").length}
-                                </div>
-                                {edit.expected && (
-                                  <pre className="removed">
-                                    <span>−</span>
-                                    {edit.expected}
-                                  </pre>
-                                )}
-                                <pre className="added">
-                                  <span>+</span>
-                                  {edit.replacement}
-                                </pre>
-                              </div>
-                            ))}
-                            {proposal.evidenceNeeded.length > 0 && (
-                              <p className="evidence-needed">
-                                Evidence needed:{" "}
-                                {proposal.evidenceNeeded.join("; ")}
-                              </p>
-                            )}
-                            <div className="proposal-actions">
-                              <Button
-                                size="sm"
-                                disabled={
-                                  applying ||
-                                  !!draftConflict ||
-                                  proposal.baseDigest !== active.digest ||
-                                  dirty ||
-                                  proposal.evidenceNeeded.length > 0
-                                }
-                                onClick={() => void decide(proposal, true)}
-                              >
-                                <Check size={13} />
-                                Accept
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={applying}
-                                onClick={() => void decide(proposal, false)}
-                              >
-                                Reject
-                              </Button>
-                            </div>
-                          </article>
-                        ))
-                      )}
-                      {history[0]?.revision === active.revision &&
-                        history[0]?.note.startsWith("Accepted:") && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="undo-proposal"
-                            disabled={applying || !!draftConflict || dirty}
-                            onClick={() => {
-                              const index = history.findIndex((item) =>
-                                item.note.startsWith("Accepted:"),
-                              );
-                              const previous = history[index + 1];
-                              if (previous) void restore(previous.revision);
-                            }}
-                          >
-                            <Undo2 size={14} />
-                            Undo proposal
-                          </Button>
-                        )}
-                      <div className="agent-composer">
-                        <label htmlFor="agent-instruction">
-                          Ask for a targeted change
-                        </label>
-                        <Textarea
-                          id="agent-instruction"
-                          disabled={applying}
-                          placeholder="Tighten this bullet, preserve my facts…"
-                          value={instruction}
-                          onChange={(event) =>
-                            setInstruction(event.target.value)
-                          }
-                          maxLength={4000}
-                        />
-                        <div>
-                          <Button
-                            size="sm"
-                            disabled={
-                              applying ||
-                              agentBusy ||
-                              !!draftConflict ||
-                              !instruction.trim()
-                            }
-                            onClick={() => void askAgent()}
-                          >
-                            {agentBusy ? (
-                              <LoaderCircle size={14} className="spin" />
-                            ) : (
-                              <Sparkles size={14} />
-                            )}
-                            {agentPolicy.mode === "autonomous"
-                              ? "Apply"
-                              : "Propose"}
-                          </Button>
-                        </div>
-                      </div>
-                    </TabsContent>
-                    <TabsContent
                       value="ats"
-                      forceMount
-                      className={`insight-content ats-content ${mobileView === "agent" ? "mobile-hide" : ""}`}
+                      className="insight-content ats-content"
                     >
                       <div className="ats-intro">
                         <h2>ATS check</h2>
@@ -1712,7 +1200,7 @@ export function Workspace() {
                             ats.engine !== engine ||
                             ats.revision !== active.revision ||
                             ats.jobDescription !== job) && (
-                            <p className="stale-proposal">
+                            <p className="stale-analysis">
                               Source changed or the job description was edited.
                               Run analysis again.
                             </p>
@@ -1797,21 +1285,6 @@ export function Workspace() {
                                   <h3>{finding.title}</h3>
                                 </div>
                                 <p>{finding.detail}</p>
-                                {finding.level === "warning" && finding.fix && (
-                                  <button
-                                    disabled={
-                                      applying || agentBusy || !!draftConflict
-                                    }
-                                    onClick={() =>
-                                      fixFinding(finding.fix ?? "")
-                                    }
-                                  >
-                                    {finding.fix === "impact"
-                                      ? "Add verified evidence"
-                                      : "Fix with assistant"}
-                                    <ChevronRight size={12} />
-                                  </button>
-                                )}
                               </article>
                             ))}
                           </div>
@@ -1872,7 +1345,10 @@ export function Workspace() {
                     <Search size={15} />
                     Search commands<kbd>⌘ K</kbd>
                   </Button>
-                  <span className="mobile-theme">{themeButton}</span>
+                  <span className="mobile-theme">
+                    <McpKeys />
+                    {themeButton}
+                  </span>
                   <UserButton />
                 </div>
               </header>
@@ -2051,13 +1527,11 @@ export function Workspace() {
                   ? "Start a new resume"
                   : modal === "history"
                     ? "Version history"
-                    : modal === "evidence"
-                      ? "Add verified evidence"
-                      : modal === "rename"
-                        ? "Rename resume"
-                        : modal === "delete"
-                          ? "Delete this resume?"
-                          : "Command menu"}
+                    : modal === "rename"
+                      ? "Rename resume"
+                      : modal === "delete"
+                        ? "Delete this resume?"
+                        : "Command menu"}
               </DialogTitle>
               <DialogDescription>
                 {modal === "gallery"
@@ -2065,12 +1539,10 @@ export function Workspace() {
                   : modal === "history"
                     ? "Restoring creates a new revision. Your existing history remains intact. The latest 100 versions are shown."
                     : modal === "delete"
-                      ? "This deletes the resume, its history, and proposals. Download a copy first if you need it."
-                      : modal === "evidence"
-                        ? "Use an outcome you can substantiate. Your own evidence will become a targeted proposal for the selected bullet."
-                        : modal === "rename"
-                          ? "Give this draft a name that helps you find it."
-                          : "Find an action. Use Ctrl or Command + K to open this menu."}
+                      ? "This deletes the resume, its history. Download a copy first if you need it."
+                      : modal === "rename"
+                        ? "Give this draft a name that helps you find it."
+                        : "Find an action. Use Ctrl or Command + K to open this menu."}
               </DialogDescription>
             </DialogHeader>
             {modal === "gallery" && (
@@ -2093,48 +1565,6 @@ export function Workspace() {
                   </button>
                 ))}
               </div>
-            )}
-            {modal === "evidence" && (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (!evidenceRange) return;
-                  const escaped = verifiedEvidence.replace(
-                    /[%&#_$]/g,
-                    (character) => "\\" + character,
-                  );
-                  const replacement =
-                    evidenceRange.expected.replace(/\.$/, "") + " " + escaped;
-                  setModal(null);
-                  void askAgent(
-                    {
-                      tool: "rewrite_bullet",
-                      start: evidenceRange.start,
-                      end: evidenceRange.end,
-                      replacement,
-                    },
-                    undefined,
-                    verifiedEvidence,
-                  );
-                }}
-              >
-                <label htmlFor="verified-outcome">Verified outcome</label>
-                <Textarea
-                  id="verified-outcome"
-                  value={verifiedEvidence}
-                  onChange={(event) => setVerifiedEvidence(event.target.value)}
-                  placeholder="Describe the outcome you can verify…"
-                  maxLength={1000}
-                />
-                <div className="dialog-actions">
-                  <Button
-                    type="submit"
-                    disabled={applying || agentBusy || !verifiedEvidence.trim()}
-                  >
-                    Review evidence proposal
-                  </Button>
-                </div>
-              </form>
             )}
             {modal === "rename" && (
               <form

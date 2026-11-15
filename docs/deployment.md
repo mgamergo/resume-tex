@@ -21,9 +21,6 @@ Supply these settings through the service's Environment configuration:
 - `NEXT_PUBLIC_CONVEX_URL`
 - `NEXT_PUBLIC_CONVEX_SITE_URL`
 - `CLERK_SECRET_KEY`
-- `AI_BASE_URL`
-- `AI_MODEL`
-- `AI_API_KEY`
 
 Only the three `NEXT_PUBLIC_*` settings are build arguments. Private keys are supplied at runtime and never passed to image construction. The image supplies its own `PDF_NODE_BINARY`, `TEX_TOOLS_DIR` and `DATA_DIR`; workstation paths must not be copied into these settings.
 
@@ -34,3 +31,5 @@ Infisical changes are not automatically synchronized to Dokploy. Refresh the ser
 The service uses Dokploy's existing GitHub connection for the private `mgamergo/resume-tex` repository, branch `dev`, with `compose.yaml`. Automatic deployments are disabled. Push the reviewed commit, then choose **Deploy** on this service. Check the build result, healthy container status and the public HTTPS URL. Verify authenticated editing and actual PDF compilation after changes to the image or host policy.
 
 The persistent development box remains separate from the deployed service. Do not destroy it or modify unrelated Dokploy services as part of redeployment.
+
+Set `MCP_OWNER_CLERK_ID` in both the app runtime and Convex backend before creating keys. Deploy Convex functions and schema before the application. No AI provider environment variables are required. This code change does not deploy either service.

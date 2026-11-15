@@ -13,22 +13,17 @@ import { ConvexError } from "convex/values";
 import { v } from "convex/values";
 import { z } from "zod";
 import {
-  applyEdits,
-  DomainError,
-  type Edit,
   engineSchema,
-  proposalInputSchema,
   sourceSchema,
-  type Proposal,
   type Resume,
   type Revision,
 } from "../lib/core/model";
 import schema from "./schema";
+import { saveDocumentSchema } from "../lib/core/mcp";
 import {
   resumeSchema,
   resumeSummarySchema,
   revisionSchema,
-  proposalSchema,
   revisionSummarySchema,
 } from "../lib/core/schemas";
 type DataModel = DataModelFromSchemaDefinition<typeof schema>;
@@ -36,13 +31,6 @@ const query: QueryBuilder<DataModel, "public"> = queryGeneric;
 const mutation: MutationBuilder<DataModel, "public"> = mutationGeneric;
 const internalMutation: MutationBuilder<DataModel, "internal"> =
   internalMutationGeneric;
-import {
-  agentEditPolicySchema,
-  submitProposalSchema,
-  setAgentEditPolicySchema,
-  type AgentEditPolicy,
-  type SubmissionResult,
-} from "../lib/core/agent-policy";
 const idSchema = z.string().min(1).max(100);
 const payloadSchema = z
   .object({
@@ -55,9 +43,6 @@ const payloadSchema = z
     baseDigest: z.string().optional(),
     expectedRevision: z.number().int().optional(),
     note: z.string().max(300).optional(),
-    input: proposalInputSchema.optional(),
-    proposalId: idSchema.optional(),
-    accept: z.boolean().optional(),
   })
   .strict();
 type Ctx = GenericQueryCtx<DataModel>;
@@ -92,16 +77,6 @@ async function get(ctx: Ctx, owner: string, id: string): Promise<Resume> {
     });
   return resumeSchema.parse(JSON.parse(value.body));
 }
-async function policyFor(
-  ctx: Ctx,
-  owner: string,
-  id: string,
-): Promise<AgentEditPolicy> {
-  const value = await row(ctx, owner, "agent-edit-policy", id);
-  return value
-    ? agentEditPolicySchema.parse(JSON.parse(value.body))
-    : { mode: "review", version: 0 };
-}
 async function relatedRows(ctx: Ctx, owner: string, id: string, kind: string) {
   return ctx.db
     .query("records")
@@ -115,25 +90,6 @@ async function historyFor(ctx: Ctx, owner: string, id: string) {
   return (await relatedRows(ctx, owner, id, "history"))
     .map((r) => revisionSummarySchema.parse(JSON.parse(r.body)))
     .sort((a, b) => b.revision - a.revision);
-}
-async function proposalsFor(ctx: Ctx, owner: string, id: string) {
-  return (await relatedRows(ctx, owner, id, "proposal"))
-    .map((r) => proposalSchema.parse(JSON.parse(r.body)))
-    .sort((a, b) => b.createdAt - a.createdAt);
-}
-function validatedEdits(source: string, edits: Edit[]) {
-  try {
-    return applyEdits(source, edits);
-  } catch (error) {
-    if (error instanceof DomainError)
-      throw new ConvexError({
-        kind: "resume-tex",
-        status: error.status,
-        code: "conflict",
-        message: error.message,
-      });
-    throw error;
-  }
 }
 async function hash(source: string) {
   return Array.from(
@@ -188,280 +144,139 @@ async function writeResume(
     body: JSON.stringify(summary),
   });
 }
-async function applyProposal(
-  ctx: MutableCtx,
+async function readFor(
+  ctx: Ctx,
   owner: string,
-  current: Resume,
-  proposal: z.infer<typeof proposalInputSchema>,
+  args: { op: string; payload: string },
 ) {
-  if (current.digest !== proposal.baseDigest)
-    throw new ConvexError({
-      kind: "resume-tex",
-      status: 409,
-      code: "conflict",
-      message: "Stale proposal",
-    });
-  if (proposal.evidenceNeeded.length)
-    throw new ConvexError({
-      kind: "resume-tex",
-      status: 422,
-      code: "evidence",
-      message:
-        "Resolve the proposal's evidence requirements before applying it",
-    });
-  const source = validatedEdits(current.source, proposal.edits);
-  const next = {
-    ...current,
-    source,
-    digest: await hash(source),
-    revision: current.revision + 1,
-    updatedAt: Date.now(),
-  };
-  await writeResume(ctx, owner, next, `Accepted: ${proposal.title}`);
-  return next;
-}
-async function recordProposal(
-  ctx: MutableCtx,
-  owner: string,
-  proposal: Proposal,
-) {
-  await ctx.db.insert("records", {
-    owner,
-    kind: "proposal",
-    key: proposal.id,
-    resumeId: proposal.resumeId,
-    body: JSON.stringify(proposal),
+  const input = payloadSchema.parse(JSON.parse(args.payload));
+  if (args.op === "list") {
+    const rows = await ctx.db
+      .query("records")
+      .withIndex("by_key", (q) => q.eq("owner", owner).eq("kind", "listing"))
+      .take(51);
+    return rows
+      .filter((r) => r.kind === "listing")
+      .map((r) => resumeSummarySchema.parse(JSON.parse(r.body)));
+  }
+  const id = idSchema.parse(input.id);
+  const current = await get(ctx, owner, id);
+  if (args.op === "get") return current;
+  if (args.op === "details")
+    return {
+      resume: current,
+      history: await historyFor(ctx, owner, id),
+    };
+  if (args.op === "revision") {
+    const value = await row(
+      ctx,
+      owner,
+      "revision",
+      `${id}:${z.number().int().parse(input.revision)}`,
+    );
+    if (!value)
+      throw new ConvexError({
+        kind: "resume-tex",
+        status: 404,
+        code: "not_found",
+        message: "Revision not found",
+      });
+    return revisionSchema.parse(JSON.parse(value.body));
+  }
+  if (args.op === "history") return historyFor(ctx, owner, id);
+  throw new ConvexError({
+    kind: "resume-tex",
+    status: 400,
+    code: "invalid",
+    message: "Unknown operation",
   });
 }
+async function writeFor(
+  ctx: MutableCtx,
+  owner: string,
+  args: { op: string; payload: string },
+) {
+  const raw: unknown = JSON.parse(args.payload);
+  const input = payloadSchema.parse(raw);
+  if (args.op === "create") {
+    const existing = await ctx.db
+      .query("records")
+      .withIndex("by_key", (q) => q.eq("owner", owner).eq("kind", "listing"))
+      .take(51);
+    if (existing.filter((r) => r.kind === "listing").length >= 50)
+      throw new ConvexError({
+        kind: "resume-tex",
+        status: 429,
+        code: "limit",
+        message: "Resume limit reached",
+      });
+    const source = sourceSchema.parse(input.source);
+    const resume: Resume = {
+      id: crypto.randomUUID(),
+      name: z.string().min(1).max(80).parse(input.name),
+      source,
+      digest: await hash(source),
+      engine: engineSchema.parse(input.engine),
+      template: input.template ?? "custom",
+      revision: 1,
+      updatedAt: Date.now(),
+    };
+    await writeResume(ctx, owner, resume, "Created from template");
+    return resume;
+  }
+  const id = idSchema.parse(input.id);
+  const current = await get(ctx, owner, id);
+  if (args.op === "remove") {
+    const doc = await row(ctx, owner, "resume", id);
+    if (doc) await ctx.db.delete(doc._id);
+    const listing = await row(ctx, owner, "listing", id);
+    if (listing) await ctx.db.delete(listing._id);
+    await ctx.scheduler.runAfter(
+      0,
+      makeFunctionReference<"mutation">("workspace:cleanup"),
+      { owner, id },
+    );
+    return;
+  }
+  if (args.op === "save") {
+    if (
+      current.digest !== input.baseDigest ||
+      current.revision !== input.expectedRevision
+    )
+      throw new ConvexError({
+        kind: "resume-tex",
+        status: 409,
+        code: "conflict",
+        message: "Revision conflict",
+      });
+    const source = sourceSchema.parse(input.source);
+    const next = {
+      ...current,
+      source,
+      digest: await hash(source),
+      name: input.name ?? current.name,
+      engine: input.engine ?? current.engine,
+      revision: current.revision + 1,
+      updatedAt: Date.now(),
+    };
+    await writeResume(ctx, owner, next, input.note ?? "Saved source");
+    return next;
+  }
+  throw new ConvexError({
+    kind: "resume-tex",
+    status: 400,
+    code: "invalid",
+    message: "Unknown operation",
+  });
+}
+
 export const read = query({
   args: { op: v.string(), payload: v.string() },
-  handler: async (ctx, args) => {
-    const owner = await ownerOf(ctx);
-    const input = payloadSchema.parse(JSON.parse(args.payload));
-    if (args.op === "list") {
-      const rows = await ctx.db
-        .query("records")
-        .withIndex("by_key", (q) => q.eq("owner", owner).eq("kind", "listing"))
-        .take(51);
-      return rows
-        .filter((r) => r.kind === "listing")
-        .map((r) => resumeSummarySchema.parse(JSON.parse(r.body)));
-    }
-    const id = idSchema.parse(input.id);
-    const current = await get(ctx, owner, id);
-    if (args.op === "get") return current;
-    if (args.op === "edit_context")
-      return { resume: current, policy: await policyFor(ctx, owner, id) };
-    if (args.op === "details")
-      return {
-        resume: current,
-        policy: await policyFor(ctx, owner, id),
-        history: await historyFor(ctx, owner, id),
-        proposals: await proposalsFor(ctx, owner, id),
-      };
-    if (args.op === "revision") {
-      const value = await row(
-        ctx,
-        owner,
-        "revision",
-        `${id}:${z.number().int().parse(input.revision)}`,
-      );
-      if (!value)
-        throw new ConvexError({
-          kind: "resume-tex",
-          status: 404,
-          code: "not_found",
-          message: "Revision not found",
-        });
-      return revisionSchema.parse(JSON.parse(value.body));
-    }
-    if (args.op === "history") return historyFor(ctx, owner, id);
-    if (args.op === "proposals") return proposalsFor(ctx, owner, id);
-    throw new ConvexError({
-      kind: "resume-tex",
-      status: 400,
-      code: "invalid",
-      message: "Unknown operation",
-    });
-  },
+  handler: async (ctx, args) => readFor(ctx, await ownerOf(ctx), args),
 });
 export const write = mutation({
   args: { op: v.string(), payload: v.string() },
-  handler: async (ctx, args) => {
-    const owner = await ownerOf(ctx);
-    const raw: unknown = JSON.parse(args.payload);
-    if (args.op === "agent_policy") {
-      const command = setAgentEditPolicySchema.parse(raw);
-      await get(ctx, owner, command.resumeId);
-      const policy = await policyFor(ctx, owner, command.resumeId);
-      if (policy.version !== command.expectedVersion)
-        throw new ConvexError({
-          kind: "resume-tex",
-          status: 409,
-          code: "conflict",
-          message:
-            "Agent permission changed. Refresh before changing it again.",
-        });
-      if (policy.mode === command.mode) return policy;
-      const next = { mode: command.mode, version: policy.version + 1 };
-      const value = await row(
-        ctx,
-        owner,
-        "agent-edit-policy",
-        command.resumeId,
-      );
-      const fields = {
-        owner,
-        kind: "agent-edit-policy",
-        key: command.resumeId,
-        resumeId: command.resumeId,
-        body: JSON.stringify(next),
-      };
-      if (value) await ctx.db.replace(value._id, fields);
-      else await ctx.db.insert("records", fields);
-      return next;
-    }
-    if (args.op === "propose") {
-      const command = submitProposalSchema.parse(raw);
-      const current = await get(ctx, owner, command.resumeId);
-      if (
-        current.digest !== command.input.baseDigest ||
-        current.revision !== command.expectedRevision
-      )
-        throw new ConvexError({
-          kind: "resume-tex",
-          status: 409,
-          code: "conflict",
-          message: "Stale proposal",
-        });
-      validatedEdits(current.source, command.input.edits);
-      const policy = await policyFor(ctx, owner, command.resumeId);
-      const base = {
-        ...command.input,
-        id: crypto.randomUUID(),
-        resumeId: current.id,
-        createdAt: Date.now(),
-      };
-      if (
-        policy.mode === "autonomous" &&
-        policy.version === command.policyVersion &&
-        !command.input.evidenceNeeded.length
-      ) {
-        const proposal = { ...base, status: "accepted" } satisfies Proposal;
-        const resume = await applyProposal(ctx, owner, current, proposal);
-        await recordProposal(ctx, owner, proposal);
-        return { kind: "applied", proposal, resume } satisfies SubmissionResult;
-      }
-      const proposal = { ...base, status: "pending" } satisfies Proposal;
-      await recordProposal(ctx, owner, proposal);
-      return { kind: "proposal", proposal } satisfies SubmissionResult;
-    }
-    const input = payloadSchema.parse(raw);
-    if (args.op === "create") {
-      const existing = await ctx.db
-        .query("records")
-        .withIndex("by_key", (q) => q.eq("owner", owner).eq("kind", "listing"))
-        .take(51);
-      if (existing.filter((r) => r.kind === "listing").length >= 50)
-        throw new ConvexError({
-          kind: "resume-tex",
-          status: 429,
-          code: "limit",
-          message: "Resume limit reached",
-        });
-      const source = sourceSchema.parse(input.source);
-      const resume: Resume = {
-        id: crypto.randomUUID(),
-        name: z.string().min(1).max(80).parse(input.name),
-        source,
-        digest: await hash(source),
-        engine: engineSchema.parse(input.engine),
-        template: input.template ?? "custom",
-        revision: 1,
-        updatedAt: Date.now(),
-      };
-      await writeResume(ctx, owner, resume, "Created from template");
-      return resume;
-    }
-    const id = idSchema.parse(input.id);
-    const current = await get(ctx, owner, id);
-    if (args.op === "remove") {
-      const doc = await row(ctx, owner, "resume", id);
-      if (doc) await ctx.db.delete(doc._id);
-      const listing = await row(ctx, owner, "listing", id);
-      if (listing) await ctx.db.delete(listing._id);
-      await ctx.scheduler.runAfter(
-        0,
-        makeFunctionReference<"mutation">("workspace:cleanup"),
-        { owner, id },
-      );
-      return;
-    }
-    if (args.op === "save") {
-      if (
-        current.digest !== input.baseDigest ||
-        current.revision !== input.expectedRevision
-      )
-        throw new ConvexError({
-          kind: "resume-tex",
-          status: 409,
-          code: "conflict",
-          message: "Revision conflict",
-        });
-      const source = sourceSchema.parse(input.source);
-      const next = {
-        ...current,
-        source,
-        digest: await hash(source),
-        name: input.name ?? current.name,
-        engine: input.engine ?? current.engine,
-        revision: current.revision + 1,
-        updatedAt: Date.now(),
-      };
-      await writeResume(ctx, owner, next, input.note ?? "Saved source");
-      return next;
-    }
-    if (args.op === "decide") {
-      const proposalRow = await row(
-        ctx,
-        owner,
-        "proposal",
-        idSchema.parse(input.proposalId),
-      );
-      if (!proposalRow || proposalRow.resumeId !== id)
-        throw new ConvexError({
-          kind: "resume-tex",
-          status: 404,
-          code: "not_found",
-          message: "Proposal not found",
-        });
-      const proposal = proposalSchema.parse(JSON.parse(proposalRow.body));
-      if (proposal.status !== "pending")
-        throw new ConvexError({
-          kind: "resume-tex",
-          status: 409,
-          code: "conflict",
-          message: "Proposal already reviewed",
-        });
-      if (input.accept) {
-        const next = await applyProposal(ctx, owner, current, proposal);
-        await ctx.db.patch(proposalRow._id, {
-          body: JSON.stringify({ ...proposal, status: "accepted" }),
-        });
-        return next;
-      }
-      await ctx.db.patch(proposalRow._id, {
-        body: JSON.stringify({ ...proposal, status: "rejected" }),
-      });
-      return current;
-    }
-    throw new ConvexError({
-      kind: "resume-tex",
-      status: 400,
-      code: "invalid",
-      message: "Unknown operation",
-    });
-  },
+  handler: async (ctx, args) => writeFor(ctx, await ownerOf(ctx), args),
 });
 
 export const cleanup = internalMutation({
@@ -481,4 +296,121 @@ export const cleanup = internalMutation({
         args,
       );
   },
+});
+
+const keySchema = z
+  .object({
+    label: z.string().trim().min(1).max(60),
+    keyHash: z.string().regex(/^[a-f0-9]{64}$/),
+    prefix: z.string().regex(/^rtx_[a-f0-9]{8}$/),
+    expiresAt: z.number().int(),
+  })
+  .strict();
+function denied(message = "Invalid or expired MCP key", status = 401): never {
+  throw new ConvexError({
+    kind: "resume-tex",
+    status,
+    code: "unauthenticated",
+    message,
+  });
+}
+async function personalOwner(ctx: Ctx) {
+  const owner = await ownerOf(ctx);
+  if (
+    !process.env.MCP_OWNER_CLERK_ID ||
+    owner !== process.env.MCP_OWNER_CLERK_ID
+  )
+    denied("MCP access is restricted to the configured owner", 403);
+  return owner;
+}
+async function agentOwner(ctx: Ctx, apiKey: string) {
+  if (!/^rtx_[a-f0-9]{64}$/.test(apiKey)) denied();
+  const keyHash = await hash(apiKey);
+  const key = await ctx.db
+    .query("mcpKeys")
+    .withIndex("by_hash", (q) => q.eq("keyHash", keyHash))
+    .unique();
+  if (
+    !key ||
+    key.expiresAt <= Date.now() ||
+    !process.env.MCP_OWNER_CLERK_ID ||
+    key.owner !== process.env.MCP_OWNER_CLERK_ID
+  )
+    denied();
+  return key.owner;
+}
+export const keys = query({
+  args: {},
+  handler: async (ctx) => {
+    const owner = await personalOwner(ctx);
+    const rows = await ctx.db
+      .query("mcpKeys")
+      .withIndex("by_owner", (q) => q.eq("owner", owner))
+      .take(21);
+    return rows.map(({ _id, label, prefix, createdAt, expiresAt }) => ({
+      id: _id,
+      label,
+      prefix,
+      createdAt,
+      expiresAt,
+    }));
+  },
+});
+export const issueKey = mutation({
+  args: { payload: v.string() },
+  handler: async (ctx, args) => {
+    const owner = await personalOwner(ctx);
+    const input = keySchema.parse(JSON.parse(args.payload));
+    const now = Date.now();
+    if (input.expiresAt <= now || input.expiresAt > now + 366 * 86400000)
+      denied("Key expiry must be within one year", 400);
+    const rows = await ctx.db
+      .query("mcpKeys")
+      .withIndex("by_owner", (q) => q.eq("owner", owner))
+      .take(21);
+    if (rows.length >= 20)
+      denied("Revoke and remove an old key before creating another", 429);
+    const id = await ctx.db.insert("mcpKeys", {
+      ...input,
+      owner,
+      createdAt: now,
+    });
+    return {
+      id,
+      label: input.label,
+      prefix: input.prefix,
+      createdAt: now,
+      expiresAt: input.expiresAt,
+    };
+  },
+});
+export const revokeKey = mutation({
+  args: { id: v.id("mcpKeys") },
+  handler: async (ctx, args) => {
+    const owner = await personalOwner(ctx);
+    const key = await ctx.db.get(args.id);
+    if (!key || key.owner !== owner) denied("Key not found", 404);
+    await ctx.db.delete(args.id);
+  },
+});
+// Time-based credentials must be checked in a fresh transaction, outside the query cache.
+export const agentRead = mutation({
+  args: { apiKey: v.string(), op: v.string(), payload: v.string() },
+  handler: async (ctx, args) => {
+    const owner = await agentOwner(ctx, args.apiKey);
+    if (args.op === "authenticate") return { owner };
+    if (!["list", "get", "revision"].includes(args.op))
+      denied("Unknown agent operation", 400);
+    return readFor(ctx, owner, args);
+  },
+});
+export const agentWrite = mutation({
+  args: { apiKey: v.string(), payload: v.string() },
+  handler: async (ctx, args) =>
+    writeFor(ctx, await agentOwner(ctx, args.apiKey), {
+      op: "save",
+      payload: JSON.stringify(
+        saveDocumentSchema.parse(JSON.parse(args.payload)),
+      ),
+    }),
 });

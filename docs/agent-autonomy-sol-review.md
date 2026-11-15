@@ -1,3 +1,5 @@
+> Historical record. The in-app Assistant and proposal controls were removed. Current agent access uses [private MCP keys](agent-tools.md).
+
 # Agent autonomy review
 
 Base: `31576cb36192dd159a3e5fe4b01068e3844fa47d`. Review command: `git diff 31576cb36192dd159a3e5fe4b01068e3844fa47d`. Model: gpt-6.1-sol, high reasoning. Usage was not returned. No pushes during review.

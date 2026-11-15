@@ -3,7 +3,7 @@ import { clerk } from "@clerk/testing/playwright";
 import { signIn, cleanup, sanitize } from "./connected";
 import { resumeSchema } from "../../lib/core/schemas";
 import { writeFile } from "node:fs/promises";
-test("real accounts isolate resumes, revisions, proposals and PDFs; stale saves conflict and signout clears source", async ({
+test("real accounts isolate resumes, revisions and PDFs; stale saves conflict and signout clears source", async ({
   page,
   request,
 }) => {
@@ -25,6 +25,14 @@ test("real accounts isolate resumes, revisions, proposals and PDFs; stale saves 
     const anonymous = await request.get("/api/workspace");
     expect(anonymous.status()).toBe(401);
     await signIn(page);
+    expect((await page.request.get("/api/mcp/keys")).status()).toBe(403);
+    expect(
+      (
+        await page.request.post("/api/mcp/keys", {
+          data: { op: "issue", label: "Unapproved account" },
+        })
+      ).status(),
+    ).toBe(403);
     const createdResponse = await page.request.post("/api/workspace", {
       data: { op: "create", name: "Private ownership check", template: "jake" },
     });

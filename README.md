@@ -1,6 +1,6 @@
 # Resume TeX
 
-A LaTeX resume workspace with a source editor, compiled PDF, reviewable assistant, version history, and PDF-derived ATS checks. Bun manages dependencies and runs builds and tests. Next.js runs on Node.js 22.
+A LaTeX resume workspace with a source editor, compiled PDF, private MCP access, version history, and PDF-derived ATS checks. Bun manages dependencies and runs builds and tests. Next.js runs on Node.js 22.
 
 ## Setup
 
@@ -11,17 +11,17 @@ bun install --frozen-lockfile
 bun run setup:tex
 ```
 
-Configure Clerk, Convex, and an OpenAI-compatible model in the dedicated Infisical project. See [cloud setup](docs/cloud-setup.md) and [.env.example](.env.example). Build and run with the same injected public configuration:
+Configure Clerk and Convex in the dedicated Infisical project. See [cloud setup](docs/cloud-setup.md) and [.env.example](.env.example). Build and run with the same injected public configuration:
 
 If system Node is a different version, set `PDF_NODE_BINARY` in `.env.local` to the absolute path of a Node 22 binary. Tests require this variable in the shell environment because Bun does not load `.env.local` in test mode. The TeX setup uses Bash when Dash is unavailable.
 
 ```sh
-infisical secrets-manager run \
+infisical run \
   --domain=https://secrets.buildwithkuro.tech \
   --projectId=35ecfc68-85d2-470c-9cb9-4ab8929cc03b \
   --env=dev --path=/ -- bun run build
 
-infisical secrets-manager run \
+infisical run \
   --domain=https://secrets.buildwithkuro.tech \
   --projectId=35ecfc68-85d2-470c-9cb9-4ab8929cc03b \
   --env=dev --path=/ -- env PDF_NODE_BINARY=/usr/bin/node APP_ORIGIN=http://localhost:3000 bun run start
@@ -39,11 +39,11 @@ Autosave uses digest and revision compare-and-set. Conflicts keep the unsaved so
 
 The theme follows the operating system by default, including live changes. Choose System, Light, or Dark to persist a preference. If browser storage is unavailable, the choice lasts for the current page.
 
-## Assistant and ATS
+## MCP and ATS
 
-The assistant requires `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY`. It sends a real structured function-call request; edits become exact, digest-bound proposals. Review is the default; the per-resume Agent edits setting can apply validated changes automatically. See [agent autonomy](docs/agent-autonomy.md). Unsupported new metrics and named skills require author evidence. Review factual accuracy before accepting a change.
+Create revocable agent credentials in **MCP** after configuring your personal Clerk user ID. Agents can read and write saved source, export LaTeX, and obtain PDF bytes directly. No AI provider key is required. See [MCP setup and tools](docs/agent-tools.md).
 
-ATS checks parse the compiled PDF, including text order, contact fields, dates, headings, columns, and job keywords. They are a heuristic, not an external vendor score. See [methodology](docs/ats-methodology.md), [tools and authenticated MCP](docs/agent-tools.md), and [sandbox architecture](docs/architecture.md).
+ATS checks parse the compiled PDF, including text order, contact fields, dates, headings, columns, and job keywords. They are a heuristic, not an external vendor score. See [methodology](docs/ats-methodology.md), [authenticated MCP](docs/agent-tools.md), and [sandbox architecture](docs/architecture.md).
 
 ## Verification
 
@@ -57,6 +57,4 @@ bun run build
 bun run test:e2e
 ```
 
-Unit fixtures and SQLite test doubles live exclusively under `tests/`. Template and compiler tests use the actual sandbox and PDF extraction. Convex emulator tests verify identity and atomic transitions. Browser tests use disposable, marked Clerk users, their private Convex documents, and the configured real model. They run one headless Chromium worker, attach diagnostics before navigation, disable credential-bearing traces, and clean up only test-owned records. External authenticated MCP e2e requires separately supplied MCP credentials.
-
-Agent edits default to review. Choose **Apply automatically** in a resume's Assistant panel to authorize the built-in assistant and external MCP agents for that resume. Automatic changes retain history and Undo. See [agent autonomy](docs/agent-autonomy.md).
+Unit fixtures and SQLite test doubles live exclusively under `tests/`. Template and compiler tests use the actual sandbox and PDF extraction. Convex emulator tests verify identity and atomic transitions. Browser tests use disposable, marked Clerk users, their private Convex documents, and a fresh local Convex backend. They run one headless Chromium worker, attach diagnostics before navigation, disable credential-bearing traces, and clean up only test-owned records. The MCP browser test creates and revokes its own test credential. `scripts/verify-mcp.ts` requires a fresh anonymous loopback Convex deployment and injects a disposable marked Clerk owner.

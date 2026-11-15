@@ -1,3 +1,5 @@
+> Historical record. The in-app Assistant and proposal controls were removed. Current agent access uses [private MCP keys](agent-tools.md).
+
 # Agent autonomy
 
 Each resume defaults to **Review each edit**. The Assistant panel offers **Apply automatically**, covering the built-in assistant and connected MCP agents. Automatic edits use the existing bounded tools and factual checks. They create accepted proposals and content revisions, so Undo proposal and history remain available.

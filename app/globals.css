@@ -869,10 +869,6 @@ svg {
 .cm-focused {
   outline: none !important;
 }
-.proposal-range {
-  background: #f1ca4d32;
-  border-bottom: 1px solid #d8ab3c;
-}
 .splitter {
   width: 6px;
   min-width: 6px;
@@ -1142,35 +1138,16 @@ svg {
 .insight-content[data-state="inactive"] {
   display: none;
 }
-.assistant-symbol {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  color: var(--primary);
-  background: var(--accent);
-  border-radius: 9px;
-  margin-bottom: 16px;
-}
-.assistant-intro h2,
 .ats-intro h2 {
   font-size: 18px;
   letter-spacing: -0.6px;
   font-weight: 600;
   margin-bottom: 10px;
 }
-.assistant-intro p,
 .ats-intro p {
   font-size: 12px;
   color: var(--muted-foreground);
   line-height: 1.65;
-}
-.assistant-intro [data-slot="badge"] {
-  font-size: 9px;
-  font-weight: 400;
-  color: var(--muted-foreground);
-  margin-top: 13px;
 }
 .suggestion-grid {
   display: grid;
@@ -1191,94 +1168,18 @@ svg {
 .suggestion-grid button:hover {
   background: var(--muted);
 }
-.no-proposals {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 11px;
-  color: var(--muted-foreground);
-  border-top: 1px solid var(--border);
-  padding-top: 19px;
-  margin-top: 20px;
-}
-.no-proposals > svg {
-  color: var(--success);
-}
-.no-proposals small {
-  display: block;
-  font-size: 10px;
-  line-height: 1.7;
-  margin-top: 4px;
-}
-.agent-composer {
-  margin-top: 35px;
-  border-top: 1px solid var(--border);
-  padding-top: 18px;
-}
-.agent-composer label,
 .ats-content > label {
   font-size: 11px;
   font-weight: 600;
   display: block;
   margin-bottom: 9px;
 }
-.agent-composer textarea,
 .ats-content textarea {
   font-size: 11px;
   line-height: 1.65;
   resize: vertical;
   min-height: 90px;
   box-shadow: none;
-}
-.agent-composer > div {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 10px;
-}
-.agent-composer > div > span {
-  color: var(--muted-foreground);
-  font-size: 9px;
-  line-height: 1.5;
-  flex: 1;
-}
-.agent-composer button {
-  font-size: 10px;
-  padding: 0 9px;
-  height: 29px;
-}
-.agent-message {
-  background: var(--accent);
-  border: 1px solid var(--border);
-  padding: 11px;
-  border-radius: 5px;
-  font-size: 11px;
-  line-height: 1.65;
-  margin-bottom: 15px;
-}
-.proposal-card {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 12px;
-  margin: 13px 0;
-}
-.proposal-heading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-.proposal-icon {
-  color: var(--primary);
-  background: var(--accent);
-  padding: 5px;
-  border-radius: 4px;
-}
-.proposal-card > p {
-  font-size: 10px;
-  color: var(--muted-foreground);
-  line-height: 1.6;
-  margin: 10px 0;
 }
 .diff-review {
   border: 1px solid var(--border);
@@ -1315,16 +1216,7 @@ svg {
   background: #55555512;
   color: var(--success);
 }
-.proposal-actions {
-  display: flex;
-  gap: 7px;
-  margin-top: 10px;
-}
-.proposal-actions button {
-  height: 28px;
-  font-size: 10px;
-}
-.stale-proposal,
+.stale-analysis,
 .evidence-needed {
   background: var(--secondary);
   color: var(--warning);
@@ -1333,10 +1225,6 @@ svg {
   line-height: 1.6;
   border-radius: 4px;
   margin: 10px 0;
-}
-.undo-proposal {
-  font-size: 10px;
-  color: var(--muted-foreground);
 }
 .ats-intro {
   margin-bottom: 22px;
@@ -1843,11 +1731,9 @@ svg {
   .mobile-pdf .pdf-pane {
     display: flex;
   }
-  .mobile-agent .document-workspace,
   .mobile-ats .document-workspace {
     display: none;
   }
-  .mobile-agent .insight-panel,
   .mobile-ats .insight-panel {
     display: flex;
     position: static;
@@ -1855,32 +1741,20 @@ svg {
     box-shadow: none;
     border: 0;
   }
-  .mobile-agent .insight-header,
   .mobile-ats .insight-header {
     display: none;
   }
-  .mobile-agent .agent-content,
   .mobile-ats .ats-content {
     display: block !important;
     max-width: 620px;
     width: 100%;
     margin-inline: auto;
   }
-  .mobile-agent .ats-content,
-  .mobile-ats .agent-content {
-    display: none !important;
-  }
   .insight-content {
     padding: 25px;
   }
-  .assistant-intro {
-    max-width: 460px;
-  }
   .suggestion-grid {
     grid-template-columns: repeat(3, 1fr);
-  }
-  .agent-composer {
-    margin-top: 25px;
   }
   .source-pane .pane-toolbar {
     padding: 0 14px;
@@ -1909,22 +1783,10 @@ svg {
   .insight-content textarea {
     font-size: 13px;
   }
-  .ats-intro p,
-  .assistant-intro p {
+  .ats-intro p {
     font-size: 13px;
   }
-  .agent-composer label,
   .ats-content > label {
-    font-size: 12px;
-  }
-  .agent-composer > div > span {
-    font-size: 10px;
-  }
-  .proposal-card {
-    max-width: 540px;
-  }
-  .proposal-card > p,
-  .proposal-card pre {
     font-size: 12px;
   }
   .findings p {
@@ -2298,12 +2160,6 @@ svg {
     font-size: 12px;
     padding: 11px;
   }
-  .agent-composer > div > span {
-    max-width: 200px;
-  }
-  .proposal-card pre {
-    font-size: 11px;
-  }
   .message {
     font-size: 10px;
     padding: 8px 10px;
@@ -2356,12 +2212,6 @@ svg {
   }
   .preview-note {
     font-size: 8px;
-  }
-  .no-proposals {
-    font-size: 12px;
-  }
-  .no-proposals small {
-    font-size: 11px;
   }
   .ats-content > textarea {
     min-height: 120px;
@@ -2470,35 +2320,6 @@ svg {
     display: none;
   }
 }
-
-.agent-policy-setting {
-  display: grid;
-  grid-template-columns: 1fr minmax(0, 1.6fr);
-  align-items: center;
-  gap: 10px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--border);
-}
-.agent-policy-setting label {
-  font-size: 12px;
-  font-weight: 600;
-}
-.agent-policy-setting select {
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--background);
-  color: var(--foreground);
-  font: inherit;
-  font-size: 12px;
-}
-.agent-policy-setting small,
-.agent-policy-setting [role="status"] {
-  grid-column: 1 / -1;
-  color: var(--muted-foreground);
-  font-size: 11px;
-}
 .draft-conflict {
   padding: 12px;
   border: 1px solid var(--border);
@@ -2511,4 +2332,70 @@ svg {
   flex-basis: 100%;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.mcp-dialog {
+  max-height: 90dvh;
+  overflow-y: auto;
+}
+.mcp-dialog input {
+  width: 100%;
+  min-width: 0;
+}
+.mcp-dialog label {
+  font-size: 13px;
+}
+.key-create {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.key-create input {
+  flex: 1;
+}
+.key-secret {
+  padding: 12px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.key-secret input {
+  margin-top: 8px;
+  font-family: monospace;
+}
+.key-secret p {
+  font-size: 12px;
+  margin-top: 8px;
+}
+.key-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.key-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.key-list li > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.key-list small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+@media (max-width: 1100px) {
+  .mcp-trigger {
+    width: 28px;
+    min-width: 28px;
+    padding: 0 !important;
+  }
+  .mcp-trigger span {
+    display: none;
+  }
 }

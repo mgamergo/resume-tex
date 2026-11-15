@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { engineSchema, proposalInputSchema, sourceSchema } from "./model";
+import { engineSchema, sourceSchema } from "./model";
 export const resumeSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -13,12 +13,6 @@ export const resumeSchema = z.object({
 export const resumeSummarySchema = resumeSchema.omit({ source: true });
 export const revisionSchema = resumeSchema.extend({ note: z.string() });
 export const revisionSummarySchema = revisionSchema.omit({ source: true });
-export const proposalSchema = proposalInputSchema.extend({
-  id: z.string(),
-  resumeId: z.string(),
-  status: z.enum(["pending", "accepted", "rejected"]),
-  createdAt: z.number(),
-});
 export const diagnosticSchema = z.object({
   line: z.number(),
   column: z.number(),
