@@ -1,5 +1,11 @@
 # Logbook
 
+## 2026-11-15 — Compose provider-variable failure audited
+
+Fetched origin/dev at b5f53d4 and checked the exact Git versions of Compose, Dockerfile, env example, startup, Next config and package scripts. None contains AI_* references or required provider interpolations; application/runtime code also has none. The verification script only unsets the obsolete variables. No runtime change was needed. A deployment error naming them comes from a different revision or Compose configuration; Dokploy was not accessed.
+
+Docker Compose config passed with an empty inherited environment, /dev/null env file and exactly the six current application names set to dummy values. Parsed output has exactly six runtime settings and three public build args, with no AI fields. The documented shell command also passed against a Compose file byte-identical to origin/dev. Format, lint and app/Convex typechecks passed. Added the reproduction and stale-configuration diagnostic to docs/deployment.md; this follow-up changes documentation only. Evidence is under ignored artifacts/compose-env-audit/.
+
 ## 2026-11-15 — Hosted Convex functions deployed
 
 Authorized deployment of dev b5f53d4 completed from a clean checkout with frozen Bun dependencies. The existing hosting configuration points to polished-gazelle-311.eu-west-1.convex.cloud, which Convex labels Development. The new key supplied through T3 secure input resolved to that exact URL before any mutation; the project environment and scoped Infisical dev/prod settings had no deploy key. Credentials stayed transient and were not saved to Infisical or Git.

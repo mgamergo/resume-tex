@@ -51,3 +51,22 @@ bunx convex deploy
 These commands change the backend and must be run by the operator. Preserve `CLERK_JWT_ISSUER_DOMAIN` on that backend, matching the Clerk application's issuer domain. The deploy key selects its associated deployment, even if the hosted app uses development accounts. Do not create a new deployment or point Dokploy to a test backend.
 
 Then deploy the current `dev` commit manually in Dokploy and verify the new build actually becomes healthy. Missing `MCP_OWNER_CLERK_ID` makes compose interpolation fail before the build; the previous container can remain live. Pushes alone do not deploy this service.
+
+## Check Compose interpolation without provider settings
+
+At `b5f53d4`, `compose.yaml`, `Dockerfile`, `.env.example`, the startup script, Next config and package scripts contain no `AI_*` references. The only executable reference is in `scripts/verify-mcp.ts`, which deletes the three old provider variables before verification. Nothing in the application build or runtime reads them.
+
+From the repository root, this check uses only the six application settings below, with dummy values. The empty environment and explicit empty env file prevent inherited provider settings from masking a required interpolation:
+
+```sh
+env -i PATH="$PATH" \
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=dummy \
+  NEXT_PUBLIC_CONVEX_URL=https://dummy.convex.cloud \
+  NEXT_PUBLIC_CONVEX_SITE_URL=https://dummy.convex.site \
+  CLERK_SECRET_KEY=dummy \
+  APP_ORIGIN=https://resume.example.test \
+  MCP_OWNER_CLERK_ID=user_dummy \
+  docker compose --env-file /dev/null -f compose.yaml config --quiet
+```
+
+This validates Compose configuration without building or starting containers. It exits zero with the checked-in file. If a deployment reports a required `AI_API_KEY`, `AI_BASE_URL` or `AI_MODEL`, compare its actual Git revision, stored Compose configuration and override files with `git show origin/dev:compose.yaml`. That error cannot originate from this revision's Compose file.
