@@ -1,5 +1,11 @@
 # Logbook
 
+## 2026-11-15 — Hosted Convex functions deployed
+
+Authorized deployment of dev b5f53d4 completed from a clean checkout with frozen Bun dependencies. The existing hosting configuration points to polished-gazelle-311.eu-west-1.convex.cloud, which Convex labels Development. The new key supplied through T3 secure input resolved to that exact URL before any mutation; the project environment and scoped Infisical dev/prod settings had no deploy key. Credentials stayed transient and were not saved to Infisical or Git.
+
+Set MCP_OWNER_CLERK_ID to the authorized personal Clerk ID and deployed the schema/functions. Type checking and schema validation passed; only the two new mcpKeys indexes were added, with no index deletion. Read-only function metadata confirms keys, issueKey, revokeKey, agentRead, agentWrite and agentCreate exist. Owner readback matches, and CLERK_JWT_ISSUER_DOMAIN is byte-for-byte unchanged. An independent anonymous keys query reaches the Authentication required guard. Evidence: ignored artifacts/convex-production-deploy/. Dokploy remains untouched; the operator owns its environment and app redeploy.
+
 ## 2026-11-15 — Overleaf-only editor, complete MCP and UI correction
 
 PR #3 did merge into dev and dev contains c9a2843, but live assets still serve the old Assistant. Missing mandatory MCP_OWNER_CLERK_ID reproduces a pre-build compose failure with the supplied env names; failed replacement is inferred without accessing Dokploy logs. The configured project cloud Convex backend also lacks the prior MCP functions. ATS had intentionally remained in PR #3. See docs/overleaf-verification.md for evidence and limits.
