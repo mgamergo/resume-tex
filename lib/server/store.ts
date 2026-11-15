@@ -5,24 +5,13 @@ import { makeFunctionReference } from "convex/server";
 
 import type {
   Engine,
-  Proposal,
   Resume,
   ResumeSummary,
   Revision,
   RevisionSummary,
 } from "../core/model";
-import {
-  editContextSchema,
-  workspaceDetailsSchema,
-  submissionResultSchema,
-  agentEditPolicySchema,
-  type AgentEditPolicy,
-  type EditContext,
-  type WorkspaceDetails,
-  type SubmitProposal,
-  type SubmissionResult,
-  type SetAgentEditPolicy,
-} from "../core/agent-policy";
+import { z } from "zod";
+import { resumeSchema, revisionSummarySchema } from "../core/schemas";
 export interface Store {
   list(): Promise<ResumeSummary[]>;
   get(id: string): Promise<Resume>;
@@ -36,12 +25,7 @@ export interface Store {
   remove(id: string): Promise<void>;
   history(id: string): Promise<RevisionSummary[]>;
   revision(id: string, revision: number): Promise<Revision>;
-  readEditContext(id: string): Promise<EditContext>;
-  details(id: string): Promise<WorkspaceDetails>;
-  propose(command: SubmitProposal): Promise<SubmissionResult>;
-  setAgentEditPolicy(command: SetAgentEditPolicy): Promise<AgentEditPolicy>;
-  proposals(id: string): Promise<Proposal[]>;
-  decide(id: string, proposalId: string, accept: boolean): Promise<Resume>;
+  details(id: string): Promise<{ resume: Resume; history: RevisionSummary[] }>;
 }
 export function getStore(token: string): Store {
   if (!process.env.NEXT_PUBLIC_CONVEX_URL)
@@ -82,26 +66,16 @@ export function getStore(token: string): Store {
     save: (input) => mutate<Resume>("save", input),
     remove: (id) => mutate<void>("remove", { id }),
     history: (id) => query<RevisionSummary[]>("history", { id }),
-    readEditContext: (id) =>
-      query<unknown>("edit_context", { id }).then((value) =>
-        editContextSchema.parse(value),
-      ),
     details: (id) =>
       query<unknown>("details", { id }).then((value) =>
-        workspaceDetailsSchema.parse(value),
-      ),
-    propose: (command) =>
-      mutate<unknown>("propose", command).then((value) =>
-        submissionResultSchema.parse(value),
-      ),
-    setAgentEditPolicy: (command) =>
-      mutate<unknown>("agent_policy", command).then((value) =>
-        agentEditPolicySchema.parse(value),
+        z
+          .object({
+            resume: resumeSchema,
+            history: z.array(revisionSummarySchema),
+          })
+          .parse(value),
       ),
     revision: (id, revision) => query<Revision>("revision", { id, revision }),
-    proposals: (id) => query<Proposal[]>("proposals", { id }),
-    decide: (id, proposalId, accept) =>
-      mutate<Resume>("decide", { id, proposalId, accept }),
   };
 }
 export type SaveInput = {

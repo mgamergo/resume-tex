@@ -7,6 +7,7 @@ export default defineConfig([
   globalIgnores([
     "convex/_generated/**",
     ".next/**",
+    ".convex/**",
     ".tools/**",
     "artifacts/**",
     "next-env.d.ts",

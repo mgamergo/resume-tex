@@ -2,16 +2,7 @@ import { z } from "zod";
 import { engineSchema, sourceSchema, DomainError } from "@/lib/core/model";
 import { templates } from "@/lib/core/templates";
 import { scope, readJson, failure } from "@/lib/server/request";
-import { agentEditModeSchema } from "@/lib/core/agent-policy";
 const command = z.discriminatedUnion("op", [
-  z
-    .object({
-      op: z.literal("agent_policy"),
-      resumeId: z.string().min(1),
-      mode: agentEditModeSchema,
-      expectedVersion: z.number().int().nonnegative(),
-    })
-    .strict(),
   z.object({
     op: z.literal("create"),
     template: z.string(),
@@ -34,12 +25,6 @@ const command = z.discriminatedUnion("op", [
     expectedRevision: z.number().int(),
     baseDigest: z.string(),
   }),
-  z.object({
-    op: z.literal("decide"),
-    id: z.string(),
-    proposalId: z.string(),
-    accept: z.boolean(),
-  }),
 ]);
 export async function GET(request: Request) {
   try {
@@ -57,14 +42,6 @@ export async function POST(request: Request) {
     const { store } = await scope(request);
     const input = command.parse(await readJson(request));
     switch (input.op) {
-      case "agent_policy":
-        return Response.json({
-          policy: await store.setAgentEditPolicy({
-            resumeId: input.resumeId,
-            mode: input.mode,
-            expectedVersion: input.expectedVersion,
-          }),
-        });
       case "create": {
         const template = templates.find((t) => t.id === input.template);
         if (!template) throw new DomainError("Unknown template");
@@ -91,10 +68,6 @@ export async function POST(request: Request) {
       case "delete":
         await store.remove(input.id);
         return Response.json({ ok: true });
-      case "decide":
-        return Response.json({
-          resume: await store.decide(input.id, input.proposalId, input.accept),
-        });
       case "restore": {
         const revision = await store.revision(input.id, input.revision);
         if (!revision) throw new DomainError("Revision not found", 404);

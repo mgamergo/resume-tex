@@ -1,5 +1,11 @@
 # Logbook
 
+## 2026-11-15 — Private MCP agent editing
+
+Removed the in-app Assistant, provider adapter, proposal APIs/state and AI environment requirements. Manual LaTeX/PDF editing, history, conflict recovery and optional ATS remain. Revocable hashed 90-day keys are issued only to MCP_OWNER_CLERK_ID, configured in both app and Convex. Stateless HTTP MCP and a key-only stdio bridge support read/write, source export and authenticated binary PDF resources without public storage. Agent reads use fresh transactions to avoid time-stale authorization caches; saves retain atomic digest/revision CAS.
+
+Editor/PDF modules load on demand. PDF documents persist across zoom; visible pages have bounded bitmaps and offscreen pages release rendering resources. Hidden tabs stop document polling. Fresh isolated Clerk/local-Convex/TeX verification and the separately requested UI/functionality Sol reviews are recorded in docs/mcp-verification.md and docs/mcp-sol-reviews.md. Formatting, app/Convex types, lint, 45 Bun tests/290 assertions, five Convex tests, build and ten Chromium cases passed without provider variables. UI Sol approved in one round; functionality Sol approved in two, resolving one batch-response RAM nit with a single-message guard and passing focused checks. Test services and marked identities are cleaned; the fresh test worker was destroyed after verified local evidence/source export. Existing deployment untouched. No deployment or push was performed.
+
 ## 2026-11-12 — Dokploy deployment verified
 
 Deployed reviewed behavior 8d4058d to https://resume-tex.buildwithkuro.tech as resume-tex in the existing Chaitanya project. Private dev source, automatic deploy disabled, allowlisted development Infisical settings, DNS and valid Let's Encrypt HTTPS. The actual nonroot/cap-drop container passed its sandbox probe and remains healthy. Format/types/lint, 55 Bun tests/337 assertions and 11 Convex tests pass; four live Chromium cases completed with exit0, three empty diagnostic reports and cleaned test identities. Earlier DNS/Clerk and supervisor failures remain separate, with session output redacted. One Sol round approved without findings. Evidence and limits: docs/deployment-verification.md. This follow-up changes documentation only; preserve the same box and existing preview.

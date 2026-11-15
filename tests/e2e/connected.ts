@@ -41,14 +41,22 @@ function users(page: Page) {
   }
   return owned;
 }
-export async function signIn(page: Page) {
+export async function signIn(page: Page, existing?: Identity) {
   await setupClerkTestingToken({ page });
-  const runId = crypto.randomUUID();
-  const user = await backend.users.createUser({
-    emailAddress: [`resume-e2e-${crypto.randomUUID()}@example.com`],
-    skipPasswordRequirement: true,
-    privateMetadata: { purpose: "resume-tex-e2e", runId },
-  });
+  const runId = existing?.runId ?? crypto.randomUUID();
+  const user = existing
+    ? await backend.users.getUser(existing.userId)
+    : await backend.users.createUser({
+        emailAddress: [`resume-e2e-${crypto.randomUUID()}@example.com`],
+        skipPasswordRequirement: true,
+        privateMetadata: { purpose: "resume-tex-e2e", runId },
+      });
+  if (
+    existing &&
+    (user.privateMetadata.purpose !== "resume-tex-e2e" ||
+      user.privateMetadata.runId !== runId)
+  )
+    throw new Error("Invalid test owner");
   const identity = { userId: user.id, runId };
   users(page).set(user.id, { ...identity, state: "created" });
   await record(identity);

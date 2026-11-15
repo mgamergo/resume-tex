@@ -21,3 +21,5 @@ README.md
 *.tsbuildinfo
 core
 core.*
+
+.convex

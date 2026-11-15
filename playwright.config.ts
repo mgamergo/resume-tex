@@ -13,6 +13,9 @@ export default defineConfig({
     headless: true,
     viewport: { width: 1440, height: 900 },
     trace: "off",
+    launchOptions: {
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+    },
     screenshot: "only-on-failure",
   },
   webServer: {

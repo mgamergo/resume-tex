@@ -4,8 +4,6 @@ import {
   EditorState,
   Annotation,
   Compartment,
-  StateEffect,
-  StateField,
   type Extension,
 } from "@codemirror/state";
 import {
@@ -15,8 +13,6 @@ import {
   highlightActiveLine,
   highlightActiveLineGutter,
   drawSelection,
-  Decoration,
-  type DecorationSet,
 } from "@codemirror/view";
 import {
   history,
@@ -46,7 +42,6 @@ import {
 } from "@codemirror/search";
 import { setDiagnostics, lintGutter } from "@codemirror/lint";
 import type { Diagnostic } from "@/lib/server/compiler";
-import type { Edit } from "@/lib/core/model";
 export type EditorHandle = {
   jump: (line: number) => void;
   setReadOnly: (value: boolean) => void;
@@ -75,33 +70,7 @@ const sourceHighlightStyle = HighlightStyle.define([
   { tag: tags.string, color: "var(--syntax-string)" },
 ]);
 const externalChange = Annotation.define<boolean>();
-const setProposals = StateEffect.define<Edit[]>();
-const proposalField = StateField.define<DecorationSet>({
-  create: () => Decoration.none,
-  update(value, transaction) {
-    value = value.map(transaction.changes);
-    for (const effect of transaction.effects)
-      if (effect.is(setProposals))
-        value = Decoration.set(
-          effect.value
-            .filter(
-              (edit) =>
-                edit.end > edit.start &&
-                edit.end <= transaction.state.doc.length,
-            )
-            .map((edit) =>
-              Decoration.mark({ class: "proposal-range" }).range(
-                edit.start,
-                edit.end,
-              ),
-            )
-            .sort((a, b) => a.from - b.from),
-          true,
-        );
-    return value;
-  },
-  provide: (field) => EditorView.decorations.from(field),
-});
+
 const theme = EditorView.theme({
   "&": {
     height: "100%",
@@ -174,9 +143,8 @@ export const SourceEditor = forwardRef<
     onSave: () => void;
     dark: boolean;
     diagnostics: Diagnostic[];
-    edits: Edit[];
   }
->(({ value, onChange, onSave, dark, diagnostics, edits }, ref) => {
+>(({ value, onChange, onSave, dark, diagnostics }, ref) => {
   const initial = useRef({ value, dark });
   const target = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
@@ -247,7 +215,6 @@ export const SourceEditor = forwardRef<
       autocompletion({ override: [latexComplete] }),
       highlightSelectionMatches(),
       lintGutter(),
-      proposalField,
       theme,
       darkCompartment.of(EditorView.theme({}, { dark: initial.current.dark })),
       keymap.of([
@@ -321,9 +288,6 @@ export const SourceEditor = forwardRef<
       ),
     );
   }, [diagnostics]);
-  useEffect(() => {
-    view.current?.dispatch({ effects: setProposals.of(edits) });
-  }, [edits]);
   return <div className="source-editor" ref={target} />;
 });
 SourceEditor.displayName = "SourceEditor";

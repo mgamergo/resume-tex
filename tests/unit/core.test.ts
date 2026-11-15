@@ -4,37 +4,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { LocalStore } from "../fixtures/local-store";
-import { applyEdits } from "../../lib/core/model";
 import { templates } from "../fixtures/templates";
 import { compile, readArtifact, sandboxArgs } from "../../lib/server/compiler";
 import { analyzePdf } from "../../lib/core/ats";
 import { extractPdf } from "../../lib/server/pdf-text";
-import { buildProposal } from "../../lib/server/tools";
 let store: LocalStore;
 beforeAll(async () => {
   process.env.DATA_DIR = await mkdtemp(join(tmpdir(), "resume-tex-tests-"));
   store = new LocalStore("test-owner");
 });
 describe("authoritative source and immutable history", () => {
-  test("rejects overlapping or mismatched exact edits", () => {
-    expect(
-      applyEdits("hello world", [
-        { start: 6, end: 11, expected: "world", replacement: "reader" },
-      ]),
-    ).toBe("hello reader");
-    expect(() =>
-      applyEdits("hello", [
-        { start: 0, end: 5, expected: "world", replacement: "" },
-      ]),
-    ).toThrow();
-    expect(() =>
-      applyEdits("hello", [
-        { start: 0, end: 3, expected: "hel", replacement: "a" },
-        { start: 2, end: 5, expected: "llo", replacement: "b" },
-      ]),
-    ).toThrow();
-  });
-  test("atomic source and metadata CAS, tenant ownership, proposal review, immutable restore", async () => {
+  test("atomic source and metadata CAS, tenant ownership, immutable restore", async () => {
     const template = templates[0];
     const doc = await store.create({
       name: "CAS",
@@ -56,41 +36,13 @@ describe("authoritative source and immutable history", () => {
     await expect(store.save({ ...input, name: "Lost update" })).rejects.toThrow(
       "newer revision",
     );
-    const { proposal } = await store.propose({
-      resumeId: doc.id,
-      expectedRevision: renamed.revision,
-      policyVersion: 0,
-      input: buildProposal(renamed, {
-        tool: "rewrite_bullet",
-        start: renamed.source.indexOf("Built a"),
-        end: renamed.source.indexOf("Built a") + 5,
-        replacement: "Built one",
-      }),
-    });
-    expect((await store.get(doc.id)).source).toBe(doc.source);
-    await expect(other.decide(doc.id, proposal.id, true)).rejects.toThrow();
-    const accepted = await store.decide(doc.id, proposal.id, true);
-    expect(accepted.source).toContain("Built one");
-    expect((await store.history(doc.id)).length).toBe(3);
-    await expect(store.decide(doc.id, proposal.id, true)).rejects.toThrow();
-    const { proposal: stale } = await store.propose({
-      resumeId: doc.id,
-      expectedRevision: accepted.revision,
-      policyVersion: 0,
-      input: buildProposal(accepted, {
-        tool: "range_patch",
-        title: "tiny edit",
-        edits: [{ start: 0, end: 0, expected: "", replacement: "% draft\n" }],
-      }),
-    });
     const newer = await store.save({
       id: doc.id,
-      baseDigest: accepted.digest,
-      expectedRevision: accepted.revision,
-      source: accepted.source + "\n",
-      engine: accepted.engine,
+      baseDigest: renamed.digest,
+      expectedRevision: renamed.revision,
+      source: renamed.source + "\n",
+      engine: renamed.engine,
     });
-    await expect(store.decide(doc.id, stale.id, true)).rejects.toThrow("stale");
     const restored = await store.save({
       id: doc.id,
       baseDigest: newer.digest,
@@ -99,8 +51,8 @@ describe("authoritative source and immutable history", () => {
       engine: doc.engine,
       note: "Restored revision 1",
     });
-    expect(restored.revision).toBe(5);
-    expect((await store.revision(doc.id, 3)).source).toBe(accepted.source);
+    expect(restored.revision).toBe(4);
+    expect((await store.revision(doc.id, 2)).source).toBe(renamed.source);
   });
 });
 describe("isolated actual TeX compiler", () => {

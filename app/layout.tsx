@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Resume TeX",
   description:
-    "LaTeX resume editor with a reviewable assistant and PDF-based ATS insights.",
+    "LaTeX source editor with PDF preview, version history, and private MCP access.",
 };
 export default function RootLayout({
   children,

@@ -13,7 +13,7 @@ import { join, resolve } from "node:path";
 import { digest } from "../core/digest";
 import { DomainError, type Engine } from "../core/model";
 export const policy = {
-  version: "tex-isolation-1",
+  version: "tex-isolation-2",
   wallMs: 20_000,
   cpuSeconds: 12,
   memoryBytes: 805_306_368,
@@ -292,7 +292,7 @@ export async function compile(
     await writeFile(join(cache(), artifact + ".log"), log, { mode: 0o600 });
     await writeFile(
       join(cache(), artifact + ".json"),
-      JSON.stringify({ owner, sourceDigest }),
+      JSON.stringify({ owner, sourceDigest, engine }),
       { mode: 0o600 },
     );
     await pruneCache();
@@ -310,7 +310,11 @@ export async function compile(
     release();
   }
 }
-export async function readArtifact(owner: string, id: string) {
+export async function readArtifact(
+  owner: string,
+  id: string,
+  expected?: { source: string; engine: Engine },
+) {
   if (!/^[a-f0-9]{64}$/.test(id))
     throw new DomainError("Invalid artifact", 400);
   try {
@@ -321,7 +325,12 @@ export async function readArtifact(owner: string, id: string) {
       !metadata ||
       typeof metadata !== "object" ||
       !("owner" in metadata) ||
-      metadata.owner !== owner
+      metadata.owner !== owner ||
+      (expected &&
+        (!("sourceDigest" in metadata) ||
+          metadata.sourceDigest !== digest(expected.source) ||
+          !("engine" in metadata) ||
+          metadata.engine !== expected.engine))
     )
       throw new Error("Owner mismatch");
     return await readFile(join(cache(), id + ".pdf"));

@@ -12,10 +12,8 @@ services:
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:?Set the Clerk publishable key}
       NEXT_PUBLIC_CONVEX_URL: ${NEXT_PUBLIC_CONVEX_URL:?Set the Convex URL}
       NEXT_PUBLIC_CONVEX_SITE_URL: ${NEXT_PUBLIC_CONVEX_SITE_URL:?Set the Convex site URL}
+      MCP_OWNER_CLERK_ID: ${MCP_OWNER_CLERK_ID:?Set your Clerk user ID for private MCP access}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:?Set the Clerk secret key}
-      AI_BASE_URL: ${AI_BASE_URL:?Set the model API base URL}
-      AI_MODEL: ${AI_MODEL:?Set the model name}
-      AI_API_KEY: ${AI_API_KEY:?Set the model API key}
     user: "10001:10001"
     restart: unless-stopped
     read_only: true

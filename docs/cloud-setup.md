@@ -1,6 +1,6 @@
 # Configure cloud accounts
 
-The application requires Clerk authentication, Convex storage, and a configured OpenAI-compatible assistant.
+The application requires Clerk authentication and Convex storage.
 
 ## Add application settings to Infisical
 
@@ -10,14 +10,14 @@ Create a Clerk application and activate its Convex integration. Configure the ap
 
 Create the corresponding Convex development deployment and configure its public URL in Infisical. Push the repository's Convex schema/functions to that development deployment using Convex's CLI after account sign-in. The backend must validate the Clerk issuer and `convex` audience. Never disable identity checks to work around setup errors.
 
-For a real assistant, choose a provider compatible with the configured adapter and add its endpoint, model, and API key to the same Infisical project.
+Set `MCP_OWNER_CLERK_ID` to your personal Clerk user ID in both the application environment and the Convex backend. Only that account can issue MCP keys. The app requires no AI provider key. See [MCP setup](agent-tools.md).
 
 ## Inject settings into commands
 
 The installed CLI is Infisical 0.45.4. Its supported process-injection command was checked on the session devbox:
 
 ```sh
-infisical secrets-manager run \
+infisical run \
   --domain=https://secrets.buildwithkuro.tech \
   --projectId=35ecfc68-85d2-470c-9cb9-4ab8929cc03b \
   --env=dev --path=/ -- bun run dev
@@ -25,12 +25,12 @@ infisical secrets-manager run \
 
 If an HTTPS reverse proxy serves the app, set `APP_ORIGIN` to the browser origin in Infisical. Origin checks compare against that configured value.
 
-Inject settings into builds too, because Next.js public variables are compiled into browser assets. Rebuild when those public settings change. Use the same project/environment scope for build and startup. Public client keys and deployment URLs are configuration, but private provider keys and Clerk server keys must remain server-only.
+Inject settings into builds too, because Next.js public variables are compiled into browser assets. Rebuild when those public settings change. Use the same project/environment scope for build and startup. Public client keys and deployment URLs are configuration, but MCP credentials and Clerk server keys must remain server-only.
 
 Do not print environment variables or export secrets into Git. The compiler receives a separate clean environment and must never receive application credentials.
 
 ## Verify the account wiring
 
-After setup, sign in through Clerk and create, edit, save, compile, and restore a resume. Sign out, then sign in as another user and confirm that the first user's resumes and proposals are inaccessible. Check that source and PDFs return unauthorized responses without a valid session. Test an assistant proposal with the configured model, then accept and reject proposals through the review UI.
+After setup, sign in through Clerk and create, edit, save, compile, and restore a resume. Sign out, then sign in as another user and confirm that the first user's resumes are inaccessible. Check that source and PDFs return unauthorized responses without a valid session. Create an MCP key as the configured owner, connect an agent, read and save a document, retrieve its PDF, revoke the key, and verify access stops.
 
 Missing credentials and integration failures remain visible. This setup guide does not authorize deployment, public ports, domain changes, or changes to Dokploy.
