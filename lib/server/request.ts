@@ -25,16 +25,8 @@ export async function scope(request: Request) {
   if (!token)
     throw new DomainError("Clerk Convex JWT template is missing", 503);
   const bucket =
-    requestUrl.pathname === "/api/ats"
-      ? "ats"
-      : requestUrl.pathname === "/api/compile"
-        ? "compile"
-        : "workspace";
-  checkRate(
-    owner,
-    bucket,
-    bucket === "ats" ? 20 : bucket === "compile" ? 60 : 300,
-  );
+    requestUrl.pathname === "/api/compile" ? "compile" : "workspace";
+  checkRate(owner, bucket, bucket === "compile" ? 60 : 300);
   return { owner, token, store: getStore(token) };
 }
 export async function readJson(request: Request): Promise<unknown> {

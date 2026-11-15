@@ -9,6 +9,8 @@ import { z } from "zod";
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 import { createHash, randomBytes } from "node:crypto";
+import job from "../fixtures/job-listing.json";
+import { extractPdf } from "../fixtures/pdf-text";
 test.use({ screenshot: "off", trace: "off", video: "off" });
 const textResult = z.object({
   content: z.array(z.object({ type: z.literal("text"), text: z.string() })),
@@ -158,6 +160,122 @@ test("private MCP keys authorize agents, export real PDF, reconcile edits, and r
     expect((await client.listTools()).tools.map((tool) => tool.name)).toContain(
       "write_document",
     );
+    const call = async (name: string, args: Record<string, unknown> = {}) => {
+      const result = await client.callTool({ name, arguments: args });
+      expect(result.isError).not.toBe(true);
+      const value: unknown = JSON.parse(
+        textResult.parse(result).content[0].text,
+      );
+      return value;
+    };
+    const layouts = z
+      .array(z.object({ id: z.string(), source: z.string() }))
+      .parse(await call("list_templates"));
+    expect(layouts.map((layout) => layout.id)).toContain("jake");
+    const tailored = resumeSchema.parse(
+      await call("create_document", {
+        template: "jake",
+        name: `${job.company} resume`,
+      }),
+    );
+    expect(
+      z
+        .array(resumeSchema.omit({ source: true }))
+        .parse(await call("list_documents"))
+        .map((doc) => doc.id),
+    ).toContain(tailored.id);
+    const initial = resumeSchema.parse(
+      await call("read_document", { id: tailored.id }),
+    );
+    const replacement = initial.source.replace(
+      "\\section{Experience}\n\\mbox{}",
+      `\\section{Experience}\n${job.verifiedCandidateExperience}`,
+    );
+    const replaced = resumeSchema.parse(
+      await call("write_document", {
+        id: initial.id,
+        baseDigest: initial.digest,
+        expectedRevision: initial.revision,
+        source: replacement,
+        engine: initial.engine,
+      }),
+    );
+    const patch = {
+      id: replaced.id,
+      baseDigest: replaced.digest,
+      expectedRevision: replaced.revision,
+      edits: [
+        {
+          expected: "\\section{Skills}\n\\mbox{}",
+          replacement: `\\section{Skills}\n${job.keywords.join(", ")}.`,
+        },
+      ],
+    };
+    const patched = resumeSchema.parse(await call("patch_document", patch));
+    expect(
+      (await client.callTool({ name: "patch_document", arguments: patch }))
+        .isError,
+    ).toBe(true);
+    expect(
+      (
+        await client.callTool({
+          name: "patch_document",
+          arguments: {
+            ...patch,
+            baseDigest: patched.digest,
+            expectedRevision: patched.revision,
+            edits: [{ expected: "\\section", replacement: "invalid" }],
+          },
+        })
+      ).isError,
+    ).toBe(true);
+    const invalid = resumeSchema.parse(
+      await call("write_document", {
+        id: patched.id,
+        baseDigest: patched.digest,
+        expectedRevision: patched.revision,
+        engine: patched.engine,
+        source: patched.source.replace(
+          "\\end{document}",
+          "\\undefinedfixturecommand\n\\end{document}",
+        ),
+      }),
+    );
+    const failed = z
+      .object({
+        ok: z.literal(false),
+        log: z.string().min(1),
+        diagnostics: z.array(z.object({ severity: z.string() })),
+      })
+      .parse(await call("compile_pdf", { id: invalid.id }));
+    expect(failed.diagnostics.some((item) => item.severity === "error")).toBe(
+      true,
+    );
+    await call("write_document", {
+      id: invalid.id,
+      baseDigest: invalid.digest,
+      expectedRevision: invalid.revision,
+      engine: invalid.engine,
+      source: patched.source,
+    });
+    const finished = z
+      .object({ ok: z.literal(true), uri: z.string(), log: z.string().min(1) })
+      .parse(await call("compile_pdf", { id: patched.id }));
+    const returned = z
+      .object({
+        contents: z.array(
+          z.object({
+            mimeType: z.literal("application/pdf"),
+            blob: z.string(),
+          }),
+        ),
+      })
+      .parse(await client.readResource({ uri: finished.uri }));
+    const tailoredBytes = Buffer.from(returned.contents[0].blob, "base64");
+    expect(tailoredBytes.subarray(0, 5).toString()).toBe("%PDF-");
+    const tailoredText = (await extractPdf(tailoredBytes)).text;
+    for (const keyword of job.keywords) expect(tailoredText).toContain(keyword);
+    await writeFile("artifacts/mcp-job-tailored.pdf", tailoredBytes);
     const current = resumeSchema.parse(
       JSON.parse(
         textResult.parse(

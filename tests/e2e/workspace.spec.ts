@@ -129,6 +129,7 @@ async function newResume(page: Page, name: string) {
   );
 }
 async function noOverflow(page: Page) {
+  await expect(page.locator(".cl-userButtonTrigger")).toHaveCount(1);
   for (const control of await page
     .locator(
       ".editor-header button:visible, .editor-header select:visible, .editor-header a:visible",
@@ -207,6 +208,28 @@ test("360px compile remains named and keyboard-operable in both themes", async (
       await page
         .locator('select[aria-label="Theme"]:visible')
         .selectOption(theme);
+      await expect(page.locator(".cl-userButtonTrigger")).toHaveCount(1);
+      await expect(
+        page.getByRole("button", { name: "New resume", exact: true }),
+      ).toHaveCSS(
+        "color",
+        theme === "light" ? "rgb(255, 255, 255)" : "rgb(16, 16, 16)",
+      );
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth + 1,
+        ),
+      ).toBe(true);
+      if (width > 560) {
+        const brand = await page
+          .locator(".dashboard-sidebar .brand")
+          .boundingBox();
+        const header = await page.locator(".dashboard-header").boundingBox();
+        if (!brand || !header) throw new Error("Missing dashboard header");
+        expect(
+          Math.abs(brand.y + brand.height / 2 - header.y - header.height / 2),
+        ).toBeLessThan(1);
+      }
       await page.screenshot({
         path:
           "artifacts/refresh-review/" + width + "-" + theme + "-dashboard.png",
@@ -256,24 +279,13 @@ test("manual editor compiles, keeps failed PDF, restores history and exports sou
   await row.getByRole("button", { name: "Restore", exact: true }).click();
   await expect(source).toContainText("Alex Morgan");
   await expect(page.locator(".textLayer")).toContainText("Alex Morgan");
-  await page.getByLabel("Show ATS check", { exact: true }).click();
-  await page
-    .getByLabel("Job description", { exact: false })
-    .fill("Required React and TypeScript experience");
-  await page
-    .getByRole("button", { name: "Analyze compiled PDF", exact: true })
-    .click();
   await expect(
-    page.getByText("Resume readiness", { exact: true }),
-  ).toBeVisible();
-  await page.getByText("What ATS sees", { exact: true }).click();
-  await expect(page.getByTestId("ats-extracted-text")).toContainText(
-    "Alex Morgan",
-  );
-  await expect(
-    page.getByRole("button", { name: "Fix with assistant", exact: true }),
+    page.getByRole("tab", { name: "ATS check", exact: true }),
   ).toHaveCount(0);
-  await page.getByLabel("Close side panel", { exact: true }).click();
+  await expect(page.getByLabel("Show ATS check", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(page.locator(".insight-panel")).toHaveCount(0);
   const download = page.waitForEvent("download");
   await page
     .getByRole("button", { name: "Command menu (Ctrl+K)", exact: true })

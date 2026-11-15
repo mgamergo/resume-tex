@@ -8,7 +8,7 @@ import {
   resumeSummarySchema,
   revisionSchema,
 } from "../core/schemas";
-import { saveDocumentSchema } from "../core/mcp";
+import { createDocumentSchema, saveDocumentSchema } from "../core/mcp";
 
 export function getAgentStore(apiKey: string) {
   const url = process.env.NEXT_PUBLIC_CONVEX_URL;
@@ -40,6 +40,16 @@ export function getAgentStore(apiKey: string) {
       read("revision", { id, revision }).then((value) =>
         revisionSchema.parse(value),
       ),
+    create: (input: z.infer<typeof createDocumentSchema>) =>
+      convexOperation("mutation", () =>
+        client.mutation(
+          makeFunctionReference<"mutation">("workspace:agentCreate"),
+          {
+            apiKey,
+            payload: JSON.stringify(createDocumentSchema.parse(input)),
+          },
+        ),
+      ).then((value) => resumeSchema.parse(value)),
     save: (input: z.infer<typeof saveDocumentSchema>) =>
       convexOperation("mutation", () =>
         client.mutation(

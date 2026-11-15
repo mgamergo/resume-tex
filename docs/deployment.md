@@ -12,7 +12,7 @@ Bubblewrap remains the compiler boundary. Startup checks that private namespaces
 
 ## Settings
 
-The initial deployment uses an allowlisted snapshot of the existing Resume TeX **development** settings from Infisical. Its production environment was empty. Clerk, Convex and the LLM are real services; there is no local or mock runtime. Moving to production Clerk/Convex accounts is a separate configuration change.
+The initial deployment uses an allowlisted snapshot of the existing Resume TeX **development** settings from Infisical. Its production environment was empty. Clerk and Convex are real services; there is no local or mock runtime. Moving to production Clerk/Convex accounts is a separate configuration change.
 
 Supply these settings through the service's Environment configuration:
 
@@ -21,6 +21,7 @@ Supply these settings through the service's Environment configuration:
 - `NEXT_PUBLIC_CONVEX_URL`
 - `NEXT_PUBLIC_CONVEX_SITE_URL`
 - `CLERK_SECRET_KEY`
+- `MCP_OWNER_CLERK_ID`
 
 Only the three `NEXT_PUBLIC_*` settings are build arguments. Private keys are supplied at runtime and never passed to image construction. The image supplies its own `PDF_NODE_BINARY`, `TEX_TOOLS_DIR` and `DATA_DIR`; workstation paths must not be copied into these settings.
 
@@ -33,3 +34,20 @@ The service uses Dokploy's existing GitHub connection for the private `mgamergo/
 The persistent development box remains separate from the deployed service. Do not destroy it or modify unrelated Dokploy services as part of redeployment.
 
 Set `MCP_OWNER_CLERK_ID` in both the app runtime and Convex backend before creating keys. Deploy Convex functions and schema before the application. No AI provider environment variables are required. This code change does not deploy either service.
+
+## Changes required for the Overleaf-only release
+
+Add only `MCP_OWNER_CLERK_ID` to Dokploy. Its value is the personal `user_…` ID from Clerk Dashboard → Users → your account, matching the existing Clerk application. It is not a key. Remove `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY`; there is no provider code. Keep `APP_ORIGIN`, all three existing `NEXT_PUBLIC_*` values, and `CLERK_SECRET_KEY`. No MCP credential or Convex deployment key belongs in Dokploy.
+
+Before rebuilding the app, deploy Convex separately from this revision. Securely inject `CONVEX_DEPLOY_KEY` for the **exact existing deployment** referenced by Dokploy's `NEXT_PUBLIC_CONVEX_URL`. Get its deploy key from that deployment's Convex Dashboard settings. In a clean checkout without anonymous test configuration, run:
+
+```sh
+bun install --frozen-lockfile
+# CONVEX_DEPLOY_KEY must already be injected securely; never commit it.
+bunx convex env set MCP_OWNER_CLERK_ID <your-clerk-user-id>
+bunx convex deploy
+```
+
+These commands change the backend and must be run by the operator. Preserve `CLERK_JWT_ISSUER_DOMAIN` on that backend, matching the Clerk application's issuer domain. The deploy key selects its associated deployment, even if the hosted app uses development accounts. Do not create a new deployment or point Dokploy to a test backend.
+
+Then deploy the current `dev` commit manually in Dokploy and verify the new build actually becomes healthy. Missing `MCP_OWNER_CLERK_ID` makes compose interpolation fail before the build; the previous container can remain live. Pushes alone do not deploy this service.

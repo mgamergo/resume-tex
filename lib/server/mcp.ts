@@ -3,7 +3,13 @@ import {
   ResourceTemplate,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { saveDocumentSchema } from "../core/mcp";
+import {
+  createDocumentSchema,
+  patchDocumentSchema,
+  patchedSource,
+  saveDocumentSchema,
+} from "../core/mcp";
+import { templates } from "../core/templates";
 import { compile, readArtifact } from "./compiler";
 import type { AgentStore } from "./agent-store";
 import { checkRate } from "./request";
@@ -14,6 +20,27 @@ export function createMcpServer(store: AgentStore) {
   const text = (value: unknown) => ({
     content: [{ type: "text" as const, text: JSON.stringify(value) }],
   });
+  server.registerTool(
+    "list_templates",
+    {
+      description:
+        "List available LaTeX templates with IDs, engines and source.",
+      inputSchema: {},
+    },
+    async () => {
+      await store.authenticate();
+      return text(templates);
+    },
+  );
+  server.registerTool(
+    "create_document",
+    {
+      description:
+        "Create a saved resume from a template ID returned by list_templates.",
+      inputSchema: createDocumentSchema.shape,
+    },
+    async (input) => text(await store.create(input)),
+  );
   server.registerTool(
     "list_documents",
     { description: "List your saved LaTeX documents.", inputSchema: {} },
@@ -36,6 +63,32 @@ export function createMcpServer(store: AgentStore) {
       inputSchema: saveDocumentSchema.shape,
     },
     async (input) => text(await store.save(input)),
+  );
+  server.registerTool(
+    "patch_document",
+    {
+      description:
+        "Apply exact-text replacements atomically against a read digest AND revision. Each expected text must match once in the original source, with no overlaps. Read again on conflict.",
+      inputSchema: patchDocumentSchema.shape,
+    },
+    async (input) => {
+      const current = await store.get(input.id);
+      if (
+        current.digest !== input.baseDigest ||
+        current.revision !== input.expectedRevision
+      )
+        throw new DomainError("Revision conflict", 409);
+      const source = patchedSource(current.source, input.edits);
+      return text(
+        await store.save({
+          id: input.id,
+          baseDigest: input.baseDigest,
+          expectedRevision: input.expectedRevision,
+          source,
+          engine: current.engine,
+        }),
+      );
+    },
   );
   server.registerTool(
     "export_source",

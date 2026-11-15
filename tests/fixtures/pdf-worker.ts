@@ -1,4 +1,4 @@
-import { extractPdf } from "../lib/server/pdf-extract";
+import { extractPdf } from "./pdf-extract";
 let input = Buffer.alloc(0);
 try {
   for await (const chunk of process.stdin) {

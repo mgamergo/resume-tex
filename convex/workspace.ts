@@ -19,7 +19,8 @@ import {
   type Revision,
 } from "../lib/core/model";
 import schema from "./schema";
-import { saveDocumentSchema } from "../lib/core/mcp";
+import { createDocumentSchema, saveDocumentSchema } from "../lib/core/mcp";
+import { templates } from "../lib/core/templates";
 import {
   resumeSchema,
   resumeSummarySchema,
@@ -413,4 +414,24 @@ export const agentWrite = mutation({
         saveDocumentSchema.parse(JSON.parse(args.payload)),
       ),
     }),
+});
+export const agentCreate = mutation({
+  args: { apiKey: v.string(), payload: v.string() },
+  handler: async (ctx, args) => {
+    const owner = await agentOwner(ctx, args.apiKey);
+    const input = createDocumentSchema.parse(JSON.parse(args.payload));
+    const template = templates.find(
+      (template) => template.id === input.template,
+    );
+    if (!template) denied("Template not found", 404);
+    return writeFor(ctx, owner, {
+      op: "create",
+      payload: JSON.stringify({
+        name: input.name,
+        template: template.id,
+        source: template.source,
+        engine: template.engine,
+      }),
+    });
+  },
 });

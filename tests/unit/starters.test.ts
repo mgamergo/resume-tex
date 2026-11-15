@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { templates } from "../../lib/core/templates";
 import { compile, readArtifact } from "../../lib/server/compiler";
-import { extractPdf } from "../../lib/server/pdf-text";
+import { extractPdf } from "../fixtures/pdf-text";
 for (const template of templates) {
   test(`blank ${template.name} compiles with its intended engine and no career claims`, async () => {
     expect(template.source).not.toMatch(

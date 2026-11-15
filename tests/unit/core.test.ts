@@ -6,8 +6,7 @@ import { spawnSync } from "node:child_process";
 import { LocalStore } from "../fixtures/local-store";
 import { templates } from "../fixtures/templates";
 import { compile, readArtifact, sandboxArgs } from "../../lib/server/compiler";
-import { analyzePdf } from "../../lib/core/ats";
-import { extractPdf } from "../../lib/server/pdf-text";
+import { extractPdf } from "../fixtures/pdf-text";
 let store: LocalStore;
 beforeAll(async () => {
   process.env.DATA_DIR = await mkdtemp(join(tmpdir(), "resume-tex-tests-"));
@@ -118,21 +117,7 @@ describe("isolated actual TeX compiler", () => {
       const pdf = await extractPdf(bytes);
       expect(pdf.text).toContain("Alex");
       expect(pdf.text).toContain("TypeScript");
-      expect(pdf.words.length).toBeGreaterThan(30);
       expect(pdf.pages).toBe(1);
-      const analysis = analyzePdf(
-        pdf,
-        template.source,
-        "Required React and TypeScript",
-        result.digest,
-        result.artifact,
-      );
-      expect(analysis.parsed.contact.email).toBe("alex@example.com");
-      expect(analysis.parsed.experience[0].role).toContain("Software Engineer");
-      expect(analysis.parsed.education[0].institution).toContain(
-        "University of California",
-      );
-      expect(analysis.parsed.skills).toContain("React");
       const cached = await compile(
         "template-tests",
         template.source,

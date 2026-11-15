@@ -20,7 +20,6 @@ test("fresh asset preparation creates its generated directories", () => {
     );
     expect(result.status, result.stderr).toBe(0);
     expect(existsSync(join(cwd, "public/pdf.worker.min.mjs"))).toBe(true);
-    expect(existsSync(join(cwd, ".tools/pdf-worker.mjs"))).toBe(true);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }

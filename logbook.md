@@ -1,5 +1,15 @@
 # Logbook
 
+## 2026-11-15 — Overleaf-only editor, complete MCP and UI correction
+
+PR #3 did merge into dev and dev contains c9a2843, but live assets still serve the old Assistant. Missing mandatory MCP_OWNER_CLERK_ID reproduces a pre-build compose failure with the supplied env names; failed replacement is inferred without accessing Dokploy logs. The configured project cloud Convex backend also lacks the prior MCP functions. ATS had intentionally remained in PR #3. See docs/overleaf-verification.md for evidence and limits.
+
+Removed ATS UI/API/scoring/field parser/job matching and obsolete panel styles. Embedded branded Clerk SignIn, aligned sidebar/header, kept one account control per active view, and retained the full-width source/PDF workspace. MCP now lists templates, creates owner-bound resumes, applies unique exact-text patches with digest/revision CAS, fully replaces/exports source, compiles with log/errors and returns authenticated PDF bytes. Client configs and the operator's exact Dokploy/Convex steps are in docs/agent-tools.md and docs/deployment.md.
+
+The isolated real-service gate passed twice: format, lint, app/Convex types, 36 Bun tests/223 assertions, six Convex tests, build and all 11 Chromium cases, including fixture JD → HTTP MCP edits → actual PDF with keyword assertions. The later theme-capture assertion passed its focused workflow and format/types/lint. Eight diagnostic reports have no unexpected errors; only the exact expected stale-save409 is excluded. Desktop/tablet/mobile screenshots were inspected. Separate functionality/UI Sol passes each approved in one round with no findings, gpt-6.1-sol/high. Tests and identities are cleaned; evidence and review ledger are preserved locally.
+
+Authorized delivery is a fast-forward push to dev after both approvals. No PR, deployment, Dokploy access, hosted env/secret change or production Convex deployment. The operator must add MCP_OWNER_CLERK_ID in Dokploy and Convex, remove the three AI variables from Dokploy, deploy the Convex functions using the matching deployment key, then rebuild the app.
+
 ## 2026-11-15 — Private MCP agent editing
 
 Removed the in-app Assistant, provider adapter, proposal APIs/state and AI environment requirements. Manual LaTeX/PDF editing, history, conflict recovery and optional ATS remain. Revocable hashed 90-day keys are issued only to MCP_OWNER_CLERK_ID, configured in both app and Convex. Stateless HTTP MCP and a key-only stdio bridge support read/write, source export and authenticated binary PDF resources without public storage. Agent reads use fresh transactions to avoid time-stale authorization caches; saves retain atomic digest/revision CAS.

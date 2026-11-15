@@ -21,7 +21,13 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <ClerkProvider>{children}</ClerkProvider>
+        <ClerkProvider
+          localization={{
+            signIn: { start: { title: "Sign in to Resume TeX" } },
+          }}
+        >
+          {children}
+        </ClerkProvider>
       </body>
     </html>
   );

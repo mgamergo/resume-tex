@@ -1,31 +1,61 @@
-# Connect your agents with MCP
+# Connect an external agent
 
-Set `MCP_OWNER_CLERK_ID` to your Clerk user ID in both the application environment and the Convex backend environment. The backend already validates the configured Clerk issuer and `convex` audience. An unset owner disables MCP key creation and MCP access. Other signed-in accounts cannot create MCP credentials.
+Resume TeX is a LaTeX editor. Your external agent finds job listings and reads job descriptions using its own tools. This MCP server lets it create and edit your resumes, compile them, inspect errors, and retrieve actual PDF bytes. There is no model provider or job scoring service in the app.
 
-Deploy the updated Convex schema and functions before starting the updated application. This change adds `mcpKeys`; it does not migrate or delete existing resumes, history, or historical proposal records.
+## Create a key
 
-Sign in as the configured owner. Open **MCP**, enter an agent name, and select **Create key**. Copy the secret before closing the dialog. The application stores its SHA-256 hash and shows only its prefix afterward. Keys expire after 90 days. **Revoke** deletes a key and prevents subsequent MCP reads, writes, and PDF retrieval.
+Set `MCP_OWNER_CLERK_ID` to your Clerk user ID in both the application and its Convex deployment. Deploy the current Convex schema/functions first. See [deployment steps](deployment.md). Missing configuration disables MCP; other signed-in accounts cannot issue keys.
 
-## Configure a remote MCP client
+Sign in as that owner, open **MCP** in the header settings, enter an agent name, and choose **Create key**. Copy the secret once. Only its SHA-256 hash is stored; later visits show its prefix. Keys expire after 90 days. **Revoke** immediately denies subsequent tool calls and PDF reads. Keep keys in your agent's secret store or process environment, never in Git.
 
-Use a client that supports Streamable HTTP with configured bearer headers:
+The Streamable HTTP endpoint is `https://resume-tex.buildwithkuro.tech/api/mcp`. Send `Authorization: Bearer <key>`. This uses configured bearer headers rather than OAuth discovery.
+
+## Claude Code
+
+With `RESUME_TEX_MCP_KEY` supplied securely to Claude's environment, put this in `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "resume-tex": {
-      "url": "https://your-domain/api/mcp",
-      "headers": {
-        "Authorization": "Bearer <your-key>"
-      }
+      "type": "http",
+      "url": "https://resume-tex.buildwithkuro.tech/api/mcp",
+      "headers": { "Authorization": "Bearer ${RESUME_TEX_MCP_KEY}" }
     }
   }
 }
 ```
 
-Use the client's secret store or environment substitution when available. Do not commit the key. Custom bearer authentication does not provide OAuth discovery or interactive OAuth sign-in. Clients that require OAuth need a compatible adapter.
+Claude Code expands environment references in MCP configuration. See [its MCP documentation](https://code.claude.com/docs/en/mcp).
 
-For a client that supports only stdio, run the included bridge on the agent machine:
+## Codex
+
+Add this to `~/.codex/config.toml`, and supply the raw key in `RESUME_TEX_MCP_KEY` when starting Codex:
+
+```toml
+[mcp_servers.resume-tex]
+url = "https://resume-tex.buildwithkuro.tech/api/mcp"
+bearer_token_env_var = "RESUME_TEX_MCP_KEY"
+```
+
+`bearer_token_env_var` sends the Authorization bearer header. See [the Codex MCP reference](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
+
+## Generic MCP client
+
+Use this shape for clients that accept URL and headers, including compatible bots. Replace the placeholder in the client's private configuration. Environment substitution is client-specific.
+
+```json
+{
+  "mcpServers": {
+    "resume-tex": {
+      "url": "https://resume-tex.buildwithkuro.tech/api/mcp",
+      "headers": { "Authorization": "Bearer <your-key>" }
+    }
+  }
+}
+```
+
+Clients restricted to stdio can use the repository bridge with installed dependencies:
 
 ```json
 {
@@ -34,7 +64,7 @@ For a client that supports only stdio, run the included bridge on the agent mach
       "command": "bun",
       "args": ["/absolute/path/to/resume-tex/scripts/mcp.ts"],
       "env": {
-        "MCP_URL": "https://your-domain/api/mcp",
+        "MCP_URL": "https://resume-tex.buildwithkuro.tech/api/mcp",
         "MCP_API_KEY": "<your-key>"
       }
     }
@@ -42,26 +72,44 @@ For a client that supports only stdio, run the included bridge on the agent mach
 }
 ```
 
-The bridge requires the repository's installed dependencies. It does not require Clerk secrets, a Convex URL, or an AI provider key. It permits HTTP only on loopback and requires HTTPS for remote endpoints.
+The bridge receives no Clerk secret, Convex credentials or model key. Remote connections require HTTPS; HTTP is accepted only on loopback.
 
-## Use the document tools
+## Tools and workflow
 
-| Tool             | Input                                                                       | Result                                                                            |
-| ---------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `list_documents` | None                                                                        | Saved document summaries.                                                         |
-| `read_document`  | `id`                                                                        | Source, engine, digest, revision, and metadata.                                   |
-| `write_document` | `id`, `source`, `engine`, `baseDigest`, `expectedRevision`, optional `name` | The new saved revision.                                                           |
-| `export_source`  | `id`                                                                        | Embedded LaTeX text resource.                                                     |
-| `compile_pdf`    | `id`                                                                        | Compile diagnostics, engine, revision, digest, and a PDF resource URI on success. |
+| Tool              | Input                                                                       | Result                                                                                                              |
+| ----------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `list_templates`  | None                                                                        | Template IDs, names, engines and source.                                                                            |
+| `create_document` | `template`, `name`                                                          | Saved owner-bound resume and revision 1.                                                                            |
+| `list_documents`  | None                                                                        | Your resume summaries.                                                                                              |
+| `read_document`   | `id`                                                                        | LaTeX, engine, digest, revision and metadata.                                                                       |
+| `write_document`  | `id`, `source`, `engine`, `baseDigest`, `expectedRevision`, optional `name` | Full source replacement as a new immutable revision.                                                                |
+| `patch_document`  | `id`, `baseDigest`, `expectedRevision`, `edits: [{expected, replacement}]`  | Targeted atomic source edit.                                                                                        |
+| `export_source`   | `id`                                                                        | Embedded LaTeX text resource.                                                                                       |
+| `compile_pdf`     | `id`                                                                        | Success/failure, bounded compile `log`, line diagnostics, engine, revision and digest; PDF resource URI on success. |
 
-Read before writing. Supply both the digest and revision from that read. On conflict, read again and reconcile the sources before making another write. Successful agent writes retain immutable history. A clean browser editor adopts the saved source and recompiles. A dirty browser draft remains visible with conflict recovery controls.
+An agent can follow this sequence:
 
-Pass the URI from `compile_pdf` to MCP `resources/read`. It returns `application/pdf` and a base64 `blob`. Decode the blob to save the PDF. MCP supports binary resources directly; no object storage or public download URL is necessary. See the [MCP resource specification](https://modelcontextprotocol.io/specification/2025-11-25/server/resources).
+1. Find and read the job listing with its own browser/search tools. Get verified candidate facts from its user.
+2. Call `list_templates`, then `create_document`, or select an existing resume from `list_documents`.
+3. Call `read_document`. Use `write_document` for a full replacement or `patch_document` for exact-text changes. Every `expected` selector must occur exactly once in the original source. Selectors cannot overlap. All edits succeed together or nothing writes.
+4. Pass the digest and revision from the last read/save to the next edit. A conflict requires a new read and reconciliation. Never blindly retry an old write.
+5. Call `compile_pdf`. Read `log` and `diagnostics` directly in the response. Fix LaTeX errors through another read/edit/compile cycle.
+6. Pass its successful `uri` to MCP `resources/read`. Decode the returned `application/pdf` base64 `blob` and save it as a PDF.
 
-PDF access rechecks the key, document ownership, immutable revision, source digest, and engine. Artifacts remain in the bounded private compiler cache. If an artifact has been evicted, compile again. The PDF limit is 10 MiB. A previously issued URI does not grant access after key revocation or document deletion.
+PDF resources require an active key and recheck document ownership, immutable revision, source digest and engine. They are private, bounded to 10 MiB, and held in the compiler cache. Recompile if evicted. Revocation or document deletion prevents subsequent access to a previously returned URI. No public storage or temporary public URL is required.
 
-## Access boundary
+A clean browser editor adopts external saves and recompiles. Unsaved browser drafts stay visible with conflict recovery controls. Agents cannot delete resumes, issue keys, change permissions, execute commands, or read arbitrary files.
 
-A key grants read and write access to the configured owner's documents. It cannot create keys, change permissions, delete documents, execute arbitrary commands, or access arbitrary files. Bearer credentials authenticate possession of the secret, so give them only to your agents. Browser session cookies alone do not authenticate MCP.
+## Run the HTTP end-to-end test
 
-The public endpoint authenticates each request, validates Origin when supplied, bounds request bodies to 512 KB, rejects batch messages, and limits authenticated requests. It keeps no persistent MCP session or event stream. Convex checks key validity in a fresh transaction for each read and save. This avoids time-based authorization results surviving in the query cache. See [Convex guidance on time-dependent queries](https://docs.convex.dev/understanding/best-practices#dont-use-datenow-in-queries). The compiler retains its existing sandbox, single worker, bounded queue, deadlines, and cache limits. A reverse proxy should enforce deployment-level connection and request limits as well.
+After initializing a fresh anonymous local Convex backend with `CONVEX_AGENT_MODE=anonymous bunx convex init`, inject the project's Clerk development credentials and issuer, then run:
+
+```sh
+bun scripts/verify-mcp.ts
+```
+
+The verifier refuses a non-loopback/non-anonymous backend, configures only that disposable backend, creates a marked test owner, runs format/types/lint/unit/Convex/build/browser checks and cleans up. For an already prepared test environment, `bun run test:mcp:e2e` runs the MCP HTTP case alone.
+
+The test uses `tests/fixtures/job-listing.json`. It discovers templates over HTTP, creates a resume, reads and fully replaces source, applies a targeted patch, rejects stale/ambiguous patches, inspects a real failed compile, repairs it, retrieves PDF bytes and asserts the fixture's keywords in the actual PDF. It saves `artifacts/mcp-job-tailored.pdf`, then checks expiry, revocation and browser reconciliation. This exercises deterministic agent tool calls, not an LLM's browsing or writing ability.
+
+The endpoint authenticates every request, validates supplied Origin, caps JSON at 512 KB, rejects batches and bounds request rates. Convex evaluates key validity in fresh transactions, including atomic save/create authorization. Compilation keeps its existing sandbox, single worker, queue/cache bounds and deadlines.

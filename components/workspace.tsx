@@ -12,9 +12,6 @@ import {
   Redo2,
   Search,
   History,
-  PanelRightClose,
-  PanelRightOpen,
-  Check,
   AlertCircle,
   Trash2,
   Pencil,
@@ -25,14 +22,12 @@ import {
   Braces,
   LoaderCircle,
   CheckCheck,
-  BookOpen,
 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { useTheme } from "@/lib/client/theme";
 import { ThemeSelect } from "./theme-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -41,7 +36,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipTrigger,
@@ -66,7 +60,6 @@ import {
   resumeSummarySchema,
   revisionSummarySchema,
   compileSchema,
-  atsSchema,
 } from "@/lib/core/schemas";
 import type {
   Engine,
@@ -75,7 +68,6 @@ import type {
   RevisionSummary,
 } from "@/lib/core/model";
 import type { CompileResult } from "@/lib/server/compiler";
-import type { AtsReport } from "@/lib/core/ats";
 import { classifyResumeHead } from "@/lib/client/resume-head";
 type DraftConflict =
   { kind: "changed"; resume: Resume } | { kind: "unconfirmed" };
@@ -85,7 +77,7 @@ const detailResponse = z.object({
   history: z.array(revisionSummarySchema),
 });
 type Modal = "gallery" | "history" | "rename" | "delete" | "commands" | null;
-type MobileView = "source" | "pdf" | "ats";
+type MobileView = "source" | "pdf";
 function IconButton({
   label,
   children,
@@ -151,12 +143,8 @@ export function Workspace() {
   const [saveState, setSaveState] = useState<
     "saved" | "unsaved" | "saving" | "error"
   >("saved");
-  const [panel, setPanel] = useState<"ats" | null>(null);
   const [mobileView, setMobileView] = useState<MobileView>("source");
   const [showLog, setShowLog] = useState(false);
-  const [job, setJob] = useState("");
-  const [ats, setAts] = useState<AtsReport | null>(null);
-  const [atsBusy, setAtsBusy] = useState(false);
   const [split, setSplit] = useState(49);
   const [commandQuery, setCommandQuery] = useState("");
   const [dashboardTab, setDashboardTab] = useState("resumes");
@@ -310,7 +298,6 @@ export function Workspace() {
       setSource(incoming.source);
       setEngine(incoming.engine);
       setSaveState("saved");
-      setAts(null);
       setCompileResult(null);
       setError("");
       setNotice("Saved changes synced.");
@@ -443,7 +430,6 @@ export function Workspace() {
         deferredHead.current = null;
         setConflict(null);
         setHistory(detail.history);
-        setAtsBusy(false);
         activeRef.current = doc;
         draftRef.current = { source: doc.source, engine: doc.engine };
         setActive(doc);
@@ -451,7 +437,6 @@ export function Workspace() {
         setEngine(doc.engine);
         setArtifact(null);
         setCompileResult(null);
-        setAts(null);
         setError("");
         setNotice("");
         setSaveState("saved");
@@ -609,32 +594,6 @@ export function Workspace() {
       }
     }
   };
-  const runAts = async () => {
-    if (applyingRef.current) return;
-    const session = documentSession.current;
-    const doc = await save(false);
-    if (!doc || !isCurrent(doc.id, session)) return;
-    setAtsBusy(true);
-    setPanel("ats");
-    setMobileView("ats");
-    setError("");
-    try {
-      const result = await api("/api/ats", atsSchema, {
-        id: doc.id,
-        jobDescription: job,
-      });
-      if (!isCurrent(doc.id, session)) return;
-      if (activeRef.current?.revision !== result.revision) {
-        setNotice("The source changed during analysis. Run the check again.");
-        return;
-      }
-      setAts(result);
-    } catch (reason) {
-      if (isCurrent(doc.id, session)) report(reason);
-    } finally {
-      if (isCurrent(doc.id, session)) setAtsBusy(false);
-    }
-  };
   const downloadSource = () => {
     const url = URL.createObjectURL(
       new Blob([source], { type: "application/x-tex" }),
@@ -650,7 +609,6 @@ export function Workspace() {
     "Find in source",
     "Version history",
     "Download LaTeX source",
-    "Run ATS analysis",
     "New resume from template",
   ];
   const runCommand = (name: string) => {
@@ -667,9 +625,6 @@ export function Workspace() {
         break;
       case "Download LaTeX source":
         downloadSource();
-        break;
-      case "Run ATS analysis":
-        void runAts();
         break;
       case "New resume from template":
         setModal("gallery");
@@ -771,13 +726,6 @@ export function Workspace() {
                 Templates
               </button>
             </nav>
-            <div className="sidebar-bottom">
-              <div className="account-row">
-                <McpKeys />
-                {themeButton}
-                <UserButton />
-              </div>
-            </div>
           </aside>
         )}
         <main className="main-area">
@@ -870,6 +818,7 @@ export function Workspace() {
                       <span>PDF</span>
                     </a>
                   </Button>
+                  <UserButton />
                 </div>
               </header>
               <div
@@ -877,25 +826,18 @@ export function Workspace() {
                 role="tablist"
                 aria-label="Workspace view"
               >
-                {(["source", "pdf", "ats"] satisfies MobileView[]).map(
-                  (view) => (
-                    <button
-                      role="tab"
-                      aria-selected={mobileView === view}
-                      key={view}
-                      onClick={() => {
-                        setMobileView(view);
-                        if (view === "ats") setPanel(view);
-                      }}
-                    >
-                      {view === "source"
-                        ? "LaTeX"
-                        : view === "pdf"
-                          ? "PDF"
-                          : "ATS check"}
-                    </button>
-                  ),
-                )}
+                {(["source", "pdf"] satisfies MobileView[]).map((view) => (
+                  <button
+                    role="tab"
+                    aria-selected={mobileView === view}
+                    key={view}
+                    onClick={() => {
+                      setMobileView(view);
+                    }}
+                  >
+                    {view === "source" ? "LaTeX" : "PDF"}
+                  </button>
+                ))}
               </div>
               {(error || notice) && (
                 <div
@@ -935,9 +877,7 @@ export function Workspace() {
                   </Button>
                 </div>
               )}
-              <div
-                className={`editor-body panel-${panel ?? "closed"} mobile-${mobileView}`}
-              >
+              <div className={`editor-body mobile-${mobileView}`}>
                 <div
                   className="document-workspace"
                   ref={workspace}
@@ -1097,24 +1037,6 @@ export function Workspace() {
                           <Badge variant="secondary">Out of date</Badge>
                         )}
                       </span>
-                      <div>
-                        <IconButton
-                          label="Show ATS check"
-                          onClick={() => setPanel("ats")}
-                        >
-                          <CheckCheck size={15} />
-                        </IconButton>
-                        <IconButton
-                          label={panel ? "Hide side panel" : "Show side panel"}
-                          onClick={() => setPanel(panel ? null : "ats")}
-                        >
-                          {panel ? (
-                            <PanelRightClose size={15} />
-                          ) : (
-                            <PanelRightOpen size={15} />
-                          )}
-                        </IconButton>
-                      </div>
                     </div>
                     {artifact ? (
                       <PdfPreview
@@ -1142,182 +1064,6 @@ export function Workspace() {
                     )}
                   </section>
                 </div>
-                <aside className={`insight-panel ${panel ?? "closed"}`}>
-                  <Tabs
-                    value={panel ?? "ats"}
-                    onValueChange={(value) =>
-                      setPanel(value === "ats" ? "ats" : null)
-                    }
-                  >
-                    <div className="insight-header">
-                      <TabsList>
-                        <TabsTrigger value="ats">
-                          <CheckCheck size={14} />
-                          ATS check
-                        </TabsTrigger>
-                      </TabsList>
-                      <IconButton
-                        label="Close side panel"
-                        onClick={() => setPanel(null)}
-                      >
-                        <PanelRightClose size={15} />
-                      </IconButton>
-                    </div>
-                    <TabsContent
-                      value="ats"
-                      className="insight-content ats-content"
-                    >
-                      <div className="ats-intro">
-                        <h2>ATS check</h2>
-                      </div>
-                      <label htmlFor="job-description">
-                        Job description <span>Optional</span>
-                      </label>
-                      <Textarea
-                        id="job-description"
-                        value={job}
-                        onChange={(event) => setJob(event.target.value)}
-                        placeholder="Paste requirements and responsibilities…"
-                        maxLength={20_000}
-                        rows={6}
-                      />
-                      <Button
-                        onClick={() => void runAts()}
-                        disabled={applying || atsBusy}
-                        className="run-ats"
-                      >
-                        {atsBusy ? (
-                          <LoaderCircle size={14} className="spin" />
-                        ) : (
-                          <CheckCheck size={15} />
-                        )}{" "}
-                        {atsBusy ? "Reading your PDF…" : "Analyze compiled PDF"}
-                      </Button>
-                      {ats && (
-                        <div className="ats-results">
-                          {(ats.digest !== active.digest ||
-                            dirty ||
-                            ats.engine !== engine ||
-                            ats.revision !== active.revision ||
-                            ats.jobDescription !== job) && (
-                            <p className="stale-analysis">
-                              Source changed or the job description was edited.
-                              Run analysis again.
-                            </p>
-                          )}
-                          <div className="score-block">
-                            <div className="score-number">
-                              {ats.score}
-                              <small>/100</small>
-                            </div>
-                            <div>
-                              <strong>Resume readiness</strong>
-                              <p>
-                                {ats.pdf.pages} page · {ats.wordCount} words ·
-                                PDF-derived
-                              </p>
-                            </div>
-                          </div>
-                          <p className="ats-limits">
-                            A transparent heuristic, not a prediction of hiring
-                            outcomes or a proprietary ATS score.
-                          </p>
-                          <div className="score-breakdown">
-                            {ats.breakdown.map((item) => (
-                              <div key={item.name}>
-                                <span>
-                                  {item.name}
-                                  <small>{item.detail}</small>
-                                </span>
-                                <strong>
-                                  {item.earned}/{item.possible}
-                                </strong>
-                                <meter
-                                  min={0}
-                                  max={item.possible}
-                                  value={item.earned}
-                                />
-                              </div>
-                            ))}
-                          </div>
-                          {ats.keywords.length > 0 && (
-                            <section className="keyword-section">
-                              <h3>Job language</h3>
-                              <div className="keyword-tags">
-                                {ats.keywords.map((keyword) => (
-                                  <span
-                                    className={
-                                      keyword.matched ? "matched" : "missing"
-                                    }
-                                    key={keyword.term}
-                                    title={`${keyword.method} · BM25 weight ${keyword.weight.toFixed(2)}`}
-                                  >
-                                    {keyword.matched ? (
-                                      <Check size={11} />
-                                    ) : (
-                                      <Plus size={11} />
-                                    )}{" "}
-                                    {keyword.term}
-                                    {keyword.required && <b>Required</b>}
-                                  </span>
-                                ))}
-                              </div>
-                              <p>
-                                Exact terms, documented synonyms and simple
-                                suffix stems count. Missing words are prompts to
-                                check your evidence, never instructions to
-                                invent skills.
-                              </p>
-                            </section>
-                          )}
-                          <div className="findings">
-                            {ats.findings.map((finding) => (
-                              <article
-                                key={finding.id}
-                                className={finding.level}
-                              >
-                                <div>
-                                  {finding.level === "pass" ? (
-                                    <Check size={15} />
-                                  ) : (
-                                    <AlertCircle size={15} />
-                                  )}
-                                  <h3>{finding.title}</h3>
-                                </div>
-                                <p>{finding.detail}</p>
-                              </article>
-                            ))}
-                          </div>
-                          <details className="ats-extraction">
-                            <summary>
-                              <FileText size={14} />
-                              What ATS sees
-                            </summary>
-                            <p>
-                              Raw PDF reading order. Compare this with the
-                              visual preview.
-                            </p>
-                            <pre data-testid="ats-extracted-text">
-                              {ats.pdf.text}
-                            </pre>
-                          </details>
-                          <details className="ats-extraction">
-                            <summary>
-                              <BookOpen size={14} />
-                              Parsed fields
-                            </summary>
-                            {Object.entries(ats.parsed).map(([key, value]) => (
-                              <div className="parsed-field" key={key}>
-                                <strong>{key}</strong>
-                                <pre>{JSON.stringify(value, null, 2)}</pre>
-                              </div>
-                            ))}
-                          </details>
-                        </div>
-                      )}
-                    </TabsContent>
-                  </Tabs>
-                </aside>
               </div>
               <footer className="workspace-footer">
                 <span>
@@ -1345,7 +1091,7 @@ export function Workspace() {
                     <Search size={15} />
                     Search commands<kbd>⌘ K</kbd>
                   </Button>
-                  <span className="mobile-theme">
+                  <span className="workspace-settings">
                     <McpKeys />
                     {themeButton}
                   </span>
@@ -1652,9 +1398,7 @@ export function Workspace() {
                         key={command}
                         disabled={
                           (!active && !/theme|new resume/i.test(command)) ||
-                          (applying &&
-                            (command === "Save and compile" ||
-                              command === "Run ATS analysis"))
+                          (applying && command === "Save and compile")
                         }
                         onClick={() => {
                           setModal(null);

@@ -8,7 +8,7 @@ import { createMcpServer } from "../../lib/server/mcp";
 import { LocalStore } from "../fixtures/local-store";
 import { templates } from "../fixtures/templates";
 import { resumeSchema } from "../../lib/core/schemas";
-import { extractPdf } from "../../lib/server/pdf-text";
+import { extractPdf } from "../fixtures/pdf-text";
 import { z } from "zod";
 let directory = "";
 let previous: string | undefined;
@@ -43,6 +43,17 @@ test("actual MCP protocol reads/writes/exports, rejects stale writes and returns
     list: () => store.list(),
     save: (input) => store.save(input),
     revision: (id, revision) => store.revision(id, revision),
+    create: async (input) => {
+      const template = templates.find(
+        (template) => template.id === input.template,
+      );
+      if (!template) throw new Error("Template not found");
+      return store.create({
+        ...template,
+        name: input.name,
+        template: template.id,
+      });
+    },
   });
   const client = new Client({ name: "test", version: "1" });
   const [a, b] = InMemoryTransport.createLinkedPair();
@@ -50,9 +61,12 @@ test("actual MCP protocol reads/writes/exports, rejects stale writes and returns
     await server.connect(a);
     await client.connect(b);
     expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual([
+      "list_templates",
+      "create_document",
       "list_documents",
       "read_document",
       "write_document",
+      "patch_document",
       "export_source",
       "compile_pdf",
     ]);

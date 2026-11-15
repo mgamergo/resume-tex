@@ -1,6 +1,6 @@
 # Resume TeX
 
-A LaTeX resume workspace with a source editor, compiled PDF, private MCP access, version history, and PDF-derived ATS checks. Bun manages dependencies and runs builds and tests. Next.js runs on Node.js 22.
+A LaTeX resume workspace with a source editor, compiled PDF, private MCP access, version history. Bun manages dependencies and runs builds and tests. Next.js runs on Node.js 22.
 
 ## Setup
 
@@ -39,11 +39,9 @@ Autosave uses digest and revision compare-and-set. Conflicts keep the unsaved so
 
 The theme follows the operating system by default, including live changes. Choose System, Light, or Dark to persist a preference. If browser storage is unavailable, the choice lasts for the current page.
 
-## MCP and ATS
+## External agents
 
-Create revocable agent credentials in **MCP** after configuring your personal Clerk user ID. Agents can read and write saved source, export LaTeX, and obtain PDF bytes directly. No AI provider key is required. See [MCP setup and tools](docs/agent-tools.md).
-
-ATS checks parse the compiled PDF, including text order, contact fields, dates, headings, columns, and job keywords. They are a heuristic, not an external vendor score. See [methodology](docs/ats-methodology.md), [authenticated MCP](docs/agent-tools.md), and [sandbox architecture](docs/architecture.md).
+Create revocable agent credentials in **MCP** after configuring your personal Clerk user ID. Agents can list templates, create resumes, read/replace/patch source, inspect compile logs, and obtain PDF bytes directly. No AI provider key is required. See [MCP setup and tools](docs/agent-tools.md).
 
 ## Verification
 

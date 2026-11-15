@@ -47,6 +47,34 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 describe("manual source and agent authorization", () => {
+  it("agent template creation is owner-bound, validates templates, and stops after revocation", async () => {
+    const { t, owner, other, issue, read } = fixture();
+    const key = await issue();
+    const create = (apiKey = secret, template = "jake") =>
+      t.mutation(app.api.workspace.agentCreate, {
+        apiKey,
+        payload: JSON.stringify({ template, name: "Agent created" }),
+      });
+    const doc = resumeSchema.parse(await create());
+    expect(doc.source).toBe(templates[0].source);
+    expect(doc.engine).toBe(templates[0].engine);
+    expect(doc.revision).toBe(1);
+    expect(await read("get", { id: doc.id })).toEqual(doc);
+    await expect(
+      other.query(app.api.workspace.read, {
+        op: "get",
+        payload: JSON.stringify({ id: doc.id }),
+      }),
+    ).rejects.toThrow("Resume not found");
+    await expect(create(secret, "missing")).rejects.toThrow(
+      "Template not found",
+    );
+    await expect(create(`rtx_${"cd".repeat(32)}`)).rejects.toThrow(
+      "Invalid or expired",
+    );
+    await owner.mutation(app.api.workspace.revokeKey, { id: key.id });
+    await expect(create()).rejects.toThrow("Invalid or expired");
+  });
   it("rejects anonymous and cross-tenant reads and preserves immutable history with revision CAS", async () => {
     const { t, owner, other, create } = fixture();
     await expect(

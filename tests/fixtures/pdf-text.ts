@@ -3,9 +3,8 @@ import { openSync, closeSync } from "node:fs";
 import { mkdtemp, writeFile, readFile, stat, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DomainError } from "../core/model";
-import { atsSchema } from "../core/schemas";
-import type { PdfText } from "../core/ats";
+import { DomainError } from "../../lib/core/model";
+import { z } from "zod";
 export const pdfExtractionPolicy = {
   wallMs: 8_000,
   memoryBytes: 4_294_967_296,
@@ -15,7 +14,9 @@ export const pdfExtractionPolicy = {
 };
 let waiting = 0;
 let tail: Promise<void> = Promise.resolve();
-export async function extractPdf(bytes: Uint8Array): Promise<PdfText> {
+export async function extractPdf(
+  bytes: Uint8Array,
+): Promise<{ text: string; pages: number }> {
   if (bytes.byteLength > pdfExtractionPolicy.maxInputBytes)
     throw new DomainError("PDF exceeds analysis input limit", 422);
   if (waiting >= pdfExtractionPolicy.maxQueue)
@@ -113,9 +114,9 @@ export async function extractPdf(bytes: Uint8Array): Promise<PdfText> {
     if ((await stat(output)).size > pdfExtractionPolicy.maxOutputBytes)
       throw new DomainError("PDF analysis output limit exceeded", 422);
     try {
-      return atsSchema.shape.pdf.parse(
-        JSON.parse(await readFile(output, "utf8")),
-      );
+      return z
+        .object({ text: z.string(), pages: z.number() })
+        .parse(JSON.parse(await readFile(output, "utf8")));
     } catch {
       throw new DomainError("PDF analyzer returned invalid output", 422);
     }

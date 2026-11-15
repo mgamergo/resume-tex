@@ -11,10 +11,11 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit && tsc --noEmit -p convex/tsconfig.json",
-    "test": "bun scripts/prepare-assets.ts && bun test tests/unit && vitest run tests/convex.test.ts",
-    "test:e2e": "playwright test",
+    "test": "bun scripts/prepare-assets.ts && bun scripts/prepare-test-assets.ts && bun test tests/unit && vitest run tests/convex.test.ts",
+    "test:e2e": "bun scripts/prepare-test-assets.ts && playwright test",
     "setup:tex": "bash scripts/setup-tex.sh",
-    "mcp": "bun scripts/mcp.ts"
+    "mcp": "bun scripts/mcp.ts",
+    "test:mcp:e2e": "bun scripts/prepare-test-assets.ts && playwright test tests/e2e/mcp-editor.spec.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.25",
